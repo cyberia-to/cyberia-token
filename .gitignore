@@ -16,6 +16,10 @@ cache/
 artifacts/
 typechain-types/
 
+# Deployment records (contains sensitive deployment data)
+deployments.json
+gas-report.txt
+
 # Coverage reports
 coverage/
 coverage.json

@@ -1,41 +1,48 @@
-import { ethers, upgrades } from "hardhat";
+import { ethers, upgrades, network } from "hardhat";
+import { getNetworkConfig, getDeploymentConfig, validateEnvironment } from "./config/environments";
+import { saveDeployment } from "./utils/deployment-tracker";
 
 interface DeployConfig {
   owner: string;
   feeRecipient: string;
 }
 
-async function validateConfig(): Promise<DeployConfig> {
-  const owner = process.env.OWNER_ADDRESS;
-  const feeRecipient = process.env.FEE_RECIPIENT;
+async function validateConfig(networkName: string): Promise<DeployConfig> {
+  // Validate the environment
+  validateEnvironment(networkName);
 
-  if (!owner) {
-    throw new Error("OWNER_ADDRESS environment variable is required");
-  }
-
-  if (feeRecipient === undefined) {
-    throw new Error("FEE_RECIPIENT environment variable is required (use 0x000...000 for burn mode)");
-  }
+  // Get deployment configuration for this network
+  const config = getDeploymentConfig(networkName);
 
   // Validate addresses
-  if (!ethers.isAddress(owner)) {
-    throw new Error(`Invalid OWNER_ADDRESS: ${owner}`);
+  if (!ethers.isAddress(config.owner)) {
+    throw new Error(`Invalid OWNER_ADDRESS: ${config.owner}`);
   }
 
-  if (feeRecipient !== "0x0000000000000000000000000000000000000000" && !ethers.isAddress(feeRecipient)) {
-    throw new Error(`Invalid FEE_RECIPIENT: ${feeRecipient}`);
+  if (config.feeRecipient !== "0x0000000000000000000000000000000000000000" && !ethers.isAddress(config.feeRecipient)) {
+    throw new Error(`Invalid FEE_RECIPIENT: ${config.feeRecipient}`);
   }
 
-  return { owner, feeRecipient };
+  return config;
 }
 
-async function deployContract(config: DeployConfig) {
+async function deployContract(config: DeployConfig, networkName: string) {
+  const networkConfig = getNetworkConfig(networkName);
+
   console.log("🚀 Deploying Cyberia (CAP) Token...");
+  console.log(`🌐 Network: ${networkConfig.name} (Chain ID: ${networkConfig.chainId})`);
   console.log(`📋 Owner: ${config.owner}`);
   console.log(`💰 Fee Recipient: ${config.feeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : config.feeRecipient}`);
 
+  const [deployer] = await ethers.getSigners();
+  console.log(`🔑 Deployer: ${deployer.address}`);
+
+  const balance = await ethers.provider.getBalance(deployer.address);
+  console.log(`💵 Deployer Balance: ${ethers.formatEther(balance)} ETH`);
+
   const contractFactory = await ethers.getContractFactory("CAPToken");
 
+  console.log("\n⏳ Deploying proxy contract...");
   const contract = await upgrades.deployProxy(
     contractFactory,
     [config.owner, config.feeRecipient],
@@ -46,12 +53,36 @@ async function deployContract(config: DeployConfig) {
   );
 
   await contract.waitForDeployment();
-  const address = await contract.getAddress();
+  const proxyAddress = await contract.getAddress();
+
+  // Get implementation address
+  const implementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+
+  // Get deployment transaction details
+  const deployTx = contract.deploymentTransaction();
+  if (!deployTx) {
+    throw new Error("Deployment transaction not found");
+  }
+
+  const receipt = await deployTx.wait(networkConfig.confirmations);
+  if (!receipt) {
+    throw new Error("Transaction receipt not found");
+  }
 
   console.log(`✅ CAP Token deployed successfully!`);
-  console.log(`📍 Contract Address: ${address}`);
+  console.log(`📍 Proxy Address: ${proxyAddress}`);
+  console.log(`📍 Implementation Address: ${implementationAddress}`);
+  console.log(`📝 Transaction Hash: ${receipt.hash}`);
+  console.log(`⛽ Gas Used: ${receipt.gasUsed.toString()}`);
 
-  return { contract, address };
+  return {
+    contract,
+    proxyAddress,
+    implementationAddress,
+    txHash: receipt.hash,
+    blockNumber: receipt.blockNumber,
+    deployer: deployer.address,
+  };
 }
 
 async function verifyDeployment(address: string, config: DeployConfig) {
@@ -82,18 +113,56 @@ async function verifyDeployment(address: string, config: DeployConfig) {
 
 async function main() {
   try {
-    const config = await validateConfig();
-    const { address } = await deployContract(config);
-    await verifyDeployment(address, config);
+    const networkName = network.name;
+    const networkConfig = getNetworkConfig(networkName);
+
+    console.log("\n╔════════════════════════════════════════════════════════════════╗");
+    console.log("║         CYBERIA (CAP) TOKEN DEPLOYMENT SCRIPT                 ║");
+    console.log("╚════════════════════════════════════════════════════════════════╝\n");
+
+    const config = await validateConfig(networkName);
+    const deployment = await deployContract(config, networkName);
+    await verifyDeployment(deployment.proxyAddress, config);
+
+    // Save deployment record
+    saveDeployment(networkName, {
+      network: networkName,
+      chainId: networkConfig.chainId,
+      timestamp: new Date().toISOString(),
+      proxyAddress: deployment.proxyAddress,
+      implementationAddress: deployment.implementationAddress,
+      deployer: deployment.deployer,
+      owner: config.owner,
+      feeRecipient: config.feeRecipient,
+      txHash: deployment.txHash,
+      blockNumber: deployment.blockNumber,
+      verified: false,
+    });
 
     console.log("\n🎉 Deployment completed successfully!");
     console.log(`\n📝 Next steps:`);
-    console.log(`1. Verify contract: npx hardhat verify --network <network> ${address}`);
-    console.log(`2. Set CAP_TOKEN_ADDRESS=${address} in .env`);
-    console.log(`3. Run configuration: npm run configure`);
+
+    if (networkConfig.isTestnet || networkName === "mainnet") {
+      console.log(`1. Verify contract on Etherscan:`);
+      console.log(`   npx hardhat verify --network ${networkName} ${deployment.proxyAddress}`);
+      console.log(`\n2. View on Explorer:`);
+      console.log(`   ${networkConfig.explorerUrl}/address/${deployment.proxyAddress}`);
+    }
+
+    console.log(`\n3. Update .env with deployed address:`);
+    console.log(`   CAP_TOKEN_ADDRESS=${deployment.proxyAddress}`);
+    console.log(`\n4. Configure pools and settings (if needed):`);
+    console.log(`   npm run configure:${networkName}`);
+
+    if (networkName === "mainnet") {
+      console.log(`\n⚠️  IMPORTANT: This is a MAINNET deployment!`);
+      console.log(`   - Save all addresses and transaction hashes securely`);
+      console.log(`   - Transfer ownership to DAO governance when ready`);
+      console.log(`   - Set up monitoring and alerts`);
+    }
 
   } catch (error) {
-    console.error("❌ Deployment failed:", error);
+    console.error("\n❌ Deployment failed:", error);
     process.exitCode = 1;
   }
 }

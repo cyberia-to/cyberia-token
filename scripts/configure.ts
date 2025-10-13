@@ -1,4 +1,6 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
+import { getNetworkConfig } from "./config/environments";
+import { getDeployment } from "./utils/deployment-tracker";
 
 interface ConfigOptions {
   contractAddress: string;
@@ -13,14 +15,26 @@ interface ConfigOptions {
   shouldUnpause?: boolean;
 }
 
-async function validateConfig(): Promise<ConfigOptions> {
-  const contractAddress = process.env.CAP_TOKEN_ADDRESS;
+async function validateConfig(networkName: string): Promise<ConfigOptions> {
+  let contractAddress = process.env.CAP_TOKEN_ADDRESS;
+
+  // Try to get address from deployment history if not provided
+  if (!contractAddress) {
+    console.log("📖 CAP_TOKEN_ADDRESS not set, checking deployment history...");
+    const deployment = getDeployment(networkName);
+    if (deployment) {
+      contractAddress = deployment.proxyAddress;
+      console.log(`✅ Found deployed contract for ${networkName}: ${contractAddress}`);
+    } else {
+      throw new Error(
+        `CAP_TOKEN_ADDRESS not set and no deployment found for ${networkName}. ` +
+        `Please set CAP_TOKEN_ADDRESS in .env or deploy first.`
+      );
+    }
+  }
+
   const poolAddress = process.env.POOL_ADDRESS;
   const newFeeRecipient = process.env.NEW_FEE_RECIPIENT;
-
-  if (!contractAddress) {
-    throw new Error("CAP_TOKEN_ADDRESS environment variable is required");
-  }
 
   if (!ethers.isAddress(contractAddress)) {
     throw new Error(`Invalid CAP_TOKEN_ADDRESS: ${contractAddress}`);
@@ -167,32 +181,65 @@ async function displayCurrentConfig(contract: any, options: ConfigOptions) {
 
 async function main() {
   try {
-    console.log("🔧 Configuring CAP Token...\n");
+    const networkName = network.name;
+    const networkConfig = getNetworkConfig(networkName);
 
-    const options = await validateConfig();
+    console.log("\n╔════════════════════════════════════════════════════════════════╗");
+    console.log("║        CYBERIA (CAP) TOKEN CONFIGURATION SCRIPT               ║");
+    console.log("╚════════════════════════════════════════════════════════════════╝\n");
+
+    console.log(`🌐 Network: ${networkConfig.name} (Chain ID: ${networkConfig.chainId})`);
+
+    const options = await validateConfig(networkName);
     const contract = await getContractInstance(options.contractAddress);
 
-    console.log(`📍 Contract Address: ${options.contractAddress}`);
+    console.log(`📍 Contract Address: ${options.contractAddress}\n`);
+
+    const [signer] = await ethers.getSigners();
+    console.log(`🔑 Signer: ${signer.address}`);
+
+    // Verify signer is owner
+    const owner = await contract.owner();
+    if (signer.address !== owner) {
+      console.warn(`\n⚠️  WARNING: Signer (${signer.address}) is not the contract owner (${owner})`);
+      console.warn(`   Configuration operations will likely fail unless executed through governance.\n`);
+    }
 
     // Execute configurations
+    let operationsExecuted = 0;
+
     if (options.poolAddress) {
       await addPool(contract, options.poolAddress);
+      operationsExecuted++;
     }
 
     if (options.newFeeRecipient) {
       await updateFeeRecipient(contract, options.newFeeRecipient);
+      operationsExecuted++;
     }
 
     if (options.taxes) {
       await updateTaxes(contract, options.taxes);
+      operationsExecuted++;
     }
 
     if (options.shouldPause) {
       await pauseContract(contract);
+      operationsExecuted++;
     }
 
     if (options.shouldUnpause) {
       await unpauseContract(contract);
+      operationsExecuted++;
+    }
+
+    if (operationsExecuted === 0) {
+      console.log("ℹ️  No configuration operations specified.");
+      console.log("\nAvailable configuration options:");
+      console.log("  - POOL_ADDRESS: Add AMM pool address");
+      console.log("  - NEW_FEE_RECIPIENT: Update fee recipient");
+      console.log("  - Set pause/unpause flags in code");
+      console.log("\nSet these in your .env file and run again.");
     }
 
     // Display final configuration
@@ -200,8 +247,15 @@ async function main() {
 
     console.log("\n🎉 Configuration completed successfully!");
 
+    if (networkName === "mainnet") {
+      console.log(`\n⚠️  IMPORTANT: Production configuration updated!`);
+      console.log(`   - Verify all changes on Etherscan`);
+      console.log(`   - Update DAO documentation`);
+      console.log(`   - Notify team members`);
+    }
+
   } catch (error) {
-    console.error("❌ Configuration failed:", error);
+    console.error("\n❌ Configuration failed:", error);
     process.exitCode = 1;
   }
 }
