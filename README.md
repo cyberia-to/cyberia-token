@@ -11,7 +11,6 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 - Configurable tax system (transfer/buy/sell, max 5%)
 - AMM pool detection
 - Burn mechanism
-- Pausable
 
 ## Quick Start
 
@@ -164,11 +163,6 @@ Board Members
 ## Security
 
 ⚠️ **Not audited**. Audit required before mainnet deployment.
-
-- Tax caps: 5% hard limit
-- UUPS upgrade pattern
-- Pausable for emergencies
-- Fixed supply (no minting after deploy)
 
 ## License
 
