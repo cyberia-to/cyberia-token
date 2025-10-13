@@ -52,11 +52,11 @@ Fees go to treasury or burn (if recipient = `0x0`). Max 5% per type.
 
 ### Environments
 
-| Network | Command | Auto-detects Address |
-|---------|---------|----------------------|
-| Localhost | `npm run deploy:localhost` | ✅ |
-| Sepolia | `npm run deploy:sepolia` | ✅ |
-| Mainnet | `npm run deploy:mainnet` | ✅ |
+| Network | Command |
+|---------|---------|
+| Localhost | `npm run deploy:localhost` |
+| Sepolia | `npm run deploy:sepolia` |
+| Mainnet | `npm run deploy:mainnet` |
 
 ### Setup
 
