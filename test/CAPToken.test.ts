@@ -291,42 +291,6 @@ describe("CAPToken", function () {
 		});
 	});
 
-	describe("Pause Functionality", function () {
-		it("Should allow owner to pause and unpause", async function () {
-			await expect(cap.connect(owner).pause())
-				.to.not.be.reverted;
-
-			expect(await cap.paused()).to.be.true;
-
-			await expect(cap.connect(owner).unpause())
-				.to.not.be.reverted;
-
-			expect(await cap.paused()).to.be.false;
-		});
-
-		it("Should prevent transfers when paused", async function () {
-			await cap.connect(owner).transfer(user1.address, ethers.parseEther("1000"));
-			await cap.connect(owner).pause();
-
-			await expect(cap.connect(user1).transfer(user2.address, ethers.parseEther("100")))
-				.to.be.revertedWithCustomError(cap, "EnforcedPause");
-		});
-
-		it("Should not allow non-owner to pause", async function () {
-			await expect(cap.connect(user1).pause())
-				.to.be.revertedWithCustomError(cap, "OwnableUnauthorizedAccount");
-		});
-
-		it("Should allow transfers after unpause", async function () {
-			await cap.connect(owner).transfer(user1.address, ethers.parseEther("1000"));
-			await cap.connect(owner).pause();
-			await cap.connect(owner).unpause();
-
-			await expect(cap.connect(user1).transfer(user2.address, ethers.parseEther("100")))
-				.to.not.be.reverted;
-		});
-	});
-
 	describe("Upgrade Functionality", function () {
 		it("Should allow owner to authorize upgrades", async function () {
 			// Deploy new implementation

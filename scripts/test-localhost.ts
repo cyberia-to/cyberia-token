@@ -186,29 +186,6 @@ async function main() {
   console.log(`✓ Total supply after: ${ethers.formatEther(afterBurn)} CAP`);
   console.log(`✓ Burned: ${ethers.formatEther(burned)} CAP\n`);
 
-  // Test 11: Pause/Unpause
-  console.log("═══════════════════════════════════════════════════════════════");
-  console.log("TEST 11: Pause/Unpause Functionality");
-  console.log("═══════════════════════════════════════════════════════════════");
-  console.log("Pausing contract...");
-  await token.pause();
-
-  const isPaused = await token.paused();
-  console.log(`✓ Contract paused: ${isPaused}`);
-
-  try {
-    await token.connect(user1).transfer(user2.address, ethers.parseEther("1"));
-    console.log("✗ Transfer should have failed while paused!");
-  } catch (error) {
-    console.log("✓ Transfer blocked while paused (as expected)");
-  }
-
-  console.log("Unpausing contract...");
-  await token.unpause();
-
-  const isUnpaused = !(await token.paused());
-  console.log(`✓ Contract unpaused: ${isUnpaused}\n`);
-
   // Test 12: Burn Mode (Fee Recipient = 0x0)
   console.log("═══════════════════════════════════════════════════════════════");
   console.log("TEST 12: Burn Mode (Fee Recipient = 0x0)");
@@ -261,13 +238,6 @@ async function main() {
     console.log("✓ Non-owner blocked from adding pools");
   }
 
-  try {
-    await token.connect(user1).pause();
-    console.log("✗ Non-owner should not be able to pause!");
-  } catch (error) {
-    console.log("✓ Non-owner blocked from pausing");
-  }
-
   console.log();
 
   // Final Summary
@@ -278,12 +248,10 @@ async function main() {
   const finalSupply = await token.totalSupply();
   const finalOwner = await token.owner();
   const finalRecipient = await token.feeRecipient();
-  const finalPaused = await token.paused();
 
   console.log(`Total Supply: ${ethers.formatEther(finalSupply)} CAP`);
   console.log(`Owner: ${finalOwner}`);
   console.log(`Fee Recipient: ${finalRecipient === ethers.ZeroAddress ? "Burn Mode" : finalRecipient}`);
-  console.log(`Paused: ${finalPaused}`);
   console.log();
 
   console.log("🎉 All tests completed successfully!");

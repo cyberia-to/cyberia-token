@@ -413,12 +413,6 @@ If needed, you can override the address:
 CAP_TOKEN_ADDRESS=0x123... POOL_ADDRESS=0x456... npm run configure:sepolia
 ```
 
-### Pausing/Unpausing (Emergency Only)
-
-For legal compliance or security emergencies, the contract can be paused. This must be done through the owner (DAO governance).
-
-**Note:** Pausing should only be done in emergencies and requires owner privileges.
-
 ---
 
 ## Contract Verification

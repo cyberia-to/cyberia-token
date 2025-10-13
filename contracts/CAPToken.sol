@@ -8,9 +8,8 @@ import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/
 import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract CAPToken is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, ERC20VotesUpgradeable, OwnableUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+contract CAPToken is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
 	// Constants
 	uint256 public constant BASIS_POINTS_DENOMINATOR = 10_000; // 100% = 10000 bp
 	uint256 public constant MAX_TAX_BP = 500; // 5%
@@ -39,7 +38,6 @@ contract CAPToken is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, ER
 		__ERC20Permit_init("Cyberia");
 		__ERC20Votes_init();
 		__Ownable_init(_owner);
-		__Pausable_init();
 		__UUPSUpgradeable_init();
 
 		// Default taxes per spec
@@ -82,16 +80,6 @@ contract CAPToken is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, ER
 		emit PoolRemoved(pool);
 	}
 
-	// Emergency pause functions for legal compliance
-	function pause() external onlyOwner {
-		_pause();
-	}
-
-	function unpause() external onlyOwner {
-		_unpause();
-	}
-
-	// Burn per ERC20Burnable semantics (external function that calls internal _burn)
 	function burn(uint256 amount) external {
 		_burn(_msgSender(), amount);
 	}
@@ -102,7 +90,7 @@ contract CAPToken is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, ER
 	}
 
 	// Internal tax logic applied on transfers
-	function _update(address from, address to, uint256 value) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) whenNotPaused {
+	function _update(address from, address to, uint256 value) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
 		// No tax on mints/burns
 		if (from == address(0) || to == address(0)) {
 			super._update(from, to, value);

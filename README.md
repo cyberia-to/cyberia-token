@@ -102,7 +102,6 @@ setTaxes(uint256 transfer, uint256 sell, uint256 buy)  // Max 500 bp each
 addPool(address pool)
 removePool(address pool)
 setFeeRecipient(address recipient)  // 0x0 = burn mode
-pause() / unpause()
 upgradeToAndCall(address newImpl, bytes data)
 ```
 

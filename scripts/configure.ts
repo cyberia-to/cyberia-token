@@ -10,9 +10,7 @@ interface ConfigOptions {
     transfer: number;
     sell: number;
     buy: number;
-  };
-  shouldPause?: boolean;
-  shouldUnpause?: boolean;
+  }
 }
 
 async function validateConfig(networkName: string): Promise<ConfigOptions> {
@@ -123,45 +121,14 @@ async function updateTaxes(contract: any, taxes: { transfer: number; sell: numbe
   console.log("✅ Taxes updated successfully");
 }
 
-async function pauseContract(contract: any) {
-  const isPaused = await contract.paused();
-  if (isPaused) {
-    console.log("⚠️  Contract is already paused");
-    return;
-  }
-
-  console.log("📝 Pausing contract...");
-  const tx = await contract.pause();
-  console.log(`⏳ Transaction submitted: ${tx.hash}`);
-
-  await tx.wait();
-  console.log("✅ Contract paused successfully");
-}
-
-async function unpauseContract(contract: any) {
-  const isPaused = await contract.paused();
-  if (!isPaused) {
-    console.log("⚠️  Contract is already unpaused");
-    return;
-  }
-
-  console.log("📝 Unpausing contract...");
-  const tx = await contract.unpause();
-  console.log(`⏳ Transaction submitted: ${tx.hash}`);
-
-  await tx.wait();
-  console.log("✅ Contract unpaused successfully");
-}
-
 async function displayCurrentConfig(contract: any, options: ConfigOptions) {
   console.log("\n=== Current Configuration ===");
 
-  const [transferTax, sellTax, buyTax, feeRecipient, paused, owner] = await Promise.all([
+  const [transferTax, sellTax, buyTax, feeRecipient, owner] = await Promise.all([
     contract.transferTaxBp(),
     contract.sellTaxBp(),
     contract.buyTaxBp(),
     contract.feeRecipient(),
-    contract.paused(),
     contract.owner(),
   ]);
 
@@ -171,7 +138,6 @@ async function displayCurrentConfig(contract: any, options: ConfigOptions) {
   console.log(`Sell Tax: ${Number(sellTax) / 100}% (${sellTax} bp)`);
   console.log(`Buy Tax: ${Number(buyTax) / 100}% (${buyTax} bp)`);
   console.log(`Fee Recipient: ${feeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : feeRecipient}`);
-  console.log(`Paused: ${paused}`);
 
   if (options.poolAddress) {
     const isPool = await contract.isPool(options.poolAddress);
@@ -223,22 +189,11 @@ async function main() {
       operationsExecuted++;
     }
 
-    if (options.shouldPause) {
-      await pauseContract(contract);
-      operationsExecuted++;
-    }
-
-    if (options.shouldUnpause) {
-      await unpauseContract(contract);
-      operationsExecuted++;
-    }
-
     if (operationsExecuted === 0) {
       console.log("ℹ️  No configuration operations specified.");
       console.log("\nAvailable configuration options:");
       console.log("  - POOL_ADDRESS: Add AMM pool address");
       console.log("  - NEW_FEE_RECIPIENT: Update fee recipient");
-      console.log("  - Set pause/unpause flags in code");
       console.log("\nSet these in your .env file and run again.");
     }
 
