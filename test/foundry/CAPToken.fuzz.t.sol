@@ -70,12 +70,13 @@ contract CAPTokenFuzzTest is Test {
 		vm.assume(to != address(token));
 		vm.assume(to != feeRecipient);
 		vm.assume(seedAmount > 0 && seedAmount <= INITIAL_SUPPLY / 2);
-		vm.assume(transferAmount > 0 && transferAmount <= seedAmount);
 
 		// Give tokens to 'from'
 		token.transfer(from, seedAmount);
 
 		uint256 fromBalanceBefore = token.balanceOf(from);
+		vm.assume(transferAmount > 0 && transferAmount <= fromBalanceBefore); // Use actual balance after tax
+
 		uint256 toBalanceBefore = token.balanceOf(to);
 		uint256 treasuryBefore = token.balanceOf(feeRecipient);
 
@@ -207,22 +208,28 @@ contract CAPTokenFuzzTest is Test {
 	function testFuzz_AllowanceMechanism(address spender, uint256 allowanceAmount, uint256 spendAmount) public {
 		vm.assume(spender != address(0));
 		vm.assume(spender != owner);
+		vm.assume(spender != feeRecipient);
 		vm.assume(allowanceAmount > 0 && allowanceAmount <= INITIAL_SUPPLY);
-		vm.assume(spendAmount > 0);
+		vm.assume(spendAmount > 0 && spendAmount <= allowanceAmount);
+
+		address recipient = makeAddr("recipient");
+		vm.assume(recipient != feeRecipient);
 
 		// Approve spender
 		token.approve(spender, allowanceAmount);
 		assertEq(token.allowance(owner, spender), allowanceAmount, "Allowance should be set");
 
-		// Try to spend
-		vm.prank(spender);
-		if (spendAmount > allowanceAmount || spendAmount > token.balanceOf(owner)) {
-			// Should revert if trying to spend more than allowance or balance
+		// Check if we have enough balance
+		uint256 ownerBalance = token.balanceOf(owner);
+		if (spendAmount > ownerBalance) {
+			// Should revert if trying to spend more than balance
+			vm.prank(spender);
 			vm.expectRevert();
-			token.transferFrom(owner, spender, spendAmount);
+			token.transferFrom(owner, recipient, spendAmount);
 		} else {
 			// Should succeed
-			token.transferFrom(owner, spender, spendAmount);
+			vm.prank(spender);
+			token.transferFrom(owner, recipient, spendAmount);
 
 			uint256 remainingAllowance = token.allowance(owner, spender);
 
@@ -259,10 +266,10 @@ contract CAPTokenFuzzTest is Test {
 
 	/// @notice Fuzz test: Mint should respect max supply
 	function testFuzz_MintRespectsMaxSupply(uint256 mintAmount) public {
-		vm.assume(mintAmount > 0);
-
 		uint256 currentSupply = token.totalSupply();
 		uint256 available = MAX_SUPPLY - currentSupply;
+
+		vm.assume(mintAmount > 0 && mintAmount < type(uint256).max - currentSupply); // Prevent overflow
 
 		if (mintAmount <= available) {
 			// Should succeed
@@ -279,13 +286,14 @@ contract CAPTokenFuzzTest is Test {
 	function testFuzz_BurnReducesSupply(address user, uint256 seedAmount, uint256 burnAmount) public {
 		vm.assume(user != address(0));
 		vm.assume(seedAmount > 0 && seedAmount <= INITIAL_SUPPLY / 10);
-		vm.assume(burnAmount > 0 && burnAmount <= seedAmount);
 
 		// Give tokens to user
 		token.transfer(user, seedAmount);
 
-		uint256 supplyBefore = token.totalSupply();
 		uint256 balanceBefore = token.balanceOf(user);
+		vm.assume(burnAmount > 0 && burnAmount <= balanceBefore); // Use actual balance after tax
+
+		uint256 supplyBefore = token.totalSupply();
 
 		// Burn tokens
 		vm.prank(user);

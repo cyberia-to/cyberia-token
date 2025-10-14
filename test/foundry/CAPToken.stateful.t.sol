@@ -147,29 +147,33 @@ contract CAPTokenStatefulTest is Test {
 		token.addPool(pool1);
 		token.addPool(pool2);
 
-		// Give tokens to pools
+		// Give tokens to pools (owner pays 1% tax)
 		token.transfer(pool1, amount * 3);
 		token.transfer(pool2, amount * 3);
 
 		uint256 initialAlice = token.balanceOf(alice);
 
-		// Alice sells to pool1
+		// Alice sells to pool1 (2% tax: 1% transfer + 1% sell)
 		vm.prank(alice);
 		token.transfer(pool1, amount);
 
-		// Pool1 transfers to pool2 (pool-to-pool, no tax)
-		uint256 pool1Balance = token.balanceOf(pool1);
-		vm.prank(pool1);
-		token.transfer(pool2, amount);
+		// Pool1 received (amount - 2% tax)
+		uint256 pool1Received = (amount * (BASIS_POINTS_DENOMINATOR - 200)) / BASIS_POINTS_DENOMINATOR;
 
-		assertEq(token.balanceOf(pool2) - (amount * 3), amount, "Pool-to-pool transfer should have no tax");
+		// Pool1 transfers to pool2 (pool-to-pool, no tax)
+		uint256 pool2BalanceBefore = token.balanceOf(pool2);
+		vm.prank(pool1);
+		token.transfer(pool2, pool1Received);
+
+		assertEq(token.balanceOf(pool2) - pool2BalanceBefore, pool1Received, "Pool-to-pool transfer should have no tax");
 
 		// Pool2 transfers back to alice (buy, 0% tax by default)
 		vm.prank(pool2);
-		token.transfer(alice, amount);
+		token.transfer(alice, pool1Received);
 
-		// Alice should have net loss due to sell tax only
-		assertLt(token.balanceOf(alice), initialAlice, "Alice should have net loss from sell tax");
+		// Alice should have net loss of 2% of the amount she initially sent (allow for rounding)
+		uint256 expectedLoss = (amount * 200) / BASIS_POINTS_DENOMINATOR;
+		assertApproxEqAbs(initialAlice - token.balanceOf(alice), expectedLoss, 1, "Alice should have net loss equal to sell tax");
 	}
 
 	/*//////////////////////////////////////////////////////////////
@@ -311,8 +315,8 @@ contract CAPTokenStatefulTest is Test {
 		token.transfer(carol, amount);
 		uint256 tax2 = token.balanceOf(feeRecipient) - treasuryBefore;
 
-		// Second tax should be exactly 2x first tax
-		assertEq(tax2, tax1 * 2, "Tax should scale with new rate");
+		// Second tax should be approximately 2x first tax (allow for rounding)
+		assertApproxEqAbs(tax2, tax1 * 2, 1, "Tax should scale with new rate");
 	}
 
 	/*//////////////////////////////////////////////////////////////
