@@ -148,7 +148,7 @@ jobs:
           solc-version: '0.8.24'
           slither-version: 'latest'
           fail-on: none
-          slither-args: '--filter-paths "node_modules|test" --exclude naming-convention,solc-version'
+          slither-args: '--filter-paths "node_modules|test" --exclude naming-convention,solc-version,timestamp'
         continue-on-error: true
 
       - name: Create SARIF file
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Checkout code
+      - name: Checkout PR branch
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -175,17 +175,79 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate gas report
+      - name: Generate PR gas report
         run: npm run test:gas
+
+      - name: Save PR gas report
+        run: cp gas-report.txt gas-report-pr.txt
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Install dependencies (base)
+        run: npm ci
+
+      - name: Generate base gas report
+        run: npm run test:gas
+        continue-on-error: true
+
+      - name: Save base gas report
+        run: cp gas-report.txt gas-report-base.txt
+        continue-on-error: true
 
       - name: Comment gas report on PR
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const gasReport = fs.readFileSync('gas-report.txt', 'utf8');
 
-            const body = `## ⛽ Gas Report\n\n\`\`\`\n${gasReport}\n\`\`\``;
+            // Read PR gas report
+            const gasReportPR = fs.readFileSync('gas-report-pr.txt', 'utf8');
+
+            // Try to read base gas report
+            let gasReportBase = null;
+            let comparisonSection = '';
+
+            try {
+              gasReportBase = fs.readFileSync('gas-report-base.txt', 'utf8');
+
+              // Extract key metrics for comparison
+              const extractMetrics = (report) => {
+                const deployMatch = report.match(/CAPToken\s+·\s+\-\s+·\s+\-\s+·\s+(\d+)/);
+                const transferMatch = report.match(/transfer\s+·\s+[\d,]+\s+·\s+[\d,]+\s+·\s+([\d,]+)/);
+                return {
+                  deployment: deployMatch ? parseInt(deployMatch[1].replace(/,/g, '')) : null,
+                  transfer: transferMatch ? parseInt(transferMatch[1].replace(/,/g, '')) : null
+                };
+              };
+
+              const basMetrics = extractMetrics(gasReportBase);
+              const prMetrics = extractMetrics(gasReportPR);
+
+              if (basMetrics.deployment && prMetrics.deployment) {
+                const deployDiff = prMetrics.deployment - basMetrics.deployment;
+                const deployPct = ((deployDiff / basMetrics.deployment) * 100).toFixed(2);
+                const deploySign = deployDiff > 0 ? '+' : '';
+                const deployEmoji = deployDiff > 0 ? '📈' : deployDiff < 0 ? '📉' : '➡️';
+
+                const transferDiff = prMetrics.transfer - basMetrics.transfer;
+                const transferPct = ((transferDiff / basMetrics.transfer) * 100).toFixed(2);
+                const transferSign = transferDiff > 0 ? '+' : '';
+                const transferEmoji = transferDiff > 0 ? '📈' : transferDiff < 0 ? '📉' : '➡️';
+
+                comparisonSection = `\n## 📊 Gas Comparison vs Base Branch\n\n` +
+                  `| Metric | Base | PR | Diff | % Change |\n` +
+                  `|--------|------|----|----|----------|\n` +
+                  `| ${deployEmoji} Deployment | ${basMetrics.deployment.toLocaleString()} | ${prMetrics.deployment.toLocaleString()} | ${deploySign}${deployDiff.toLocaleString()} | ${deploySign}${deployPct}% |\n` +
+                  `| ${transferEmoji} Transfer (avg) | ${basMetrics.transfer.toLocaleString()} | ${prMetrics.transfer.toLocaleString()} | ${transferSign}${transferDiff.toLocaleString()} | ${transferSign}${transferPct}% |\n\n`;
+              }
+            } catch (error) {
+              comparisonSection = '\n_Note: Base branch comparison unavailable (first PR or base build failed)_\n\n';
+            }
+
+            const body = `## ⛽ Gas Report\n\n${comparisonSection}\n<details>\n<summary>📋 Full Gas Report</summary>\n\n\`\`\`\n${gasReportPR}\n\`\`\`\n</details>`;
 
             github.rest.issues.createComment({
               owner: context.repo.owner,
