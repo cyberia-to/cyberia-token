@@ -37,8 +37,8 @@ cp .env.example .env
 # 3. Deploy
 npm run deploy:sepolia
 
-# 4. Verify on Etherscan
-npm run verify:sepolia <PROXY_ADDRESS>
+# 4. Verify on Etherscan (auto-detects address)
+npm run verify:sepolia
 ```
 
 ### Mainnet (Production)
@@ -56,8 +56,8 @@ npm run test:all
 # 3. Deploy (⚠️ uses real ETH!)
 npm run deploy:mainnet
 
-# 4. Verify on Etherscan
-npm run verify:mainnet <PROXY_ADDRESS>
+# 4. Verify on Etherscan (auto-detects address)
+npm run verify:mainnet
 ```
 
 ---
@@ -100,8 +100,8 @@ npm run configure:mainnet    # Configure mainnet
 ### Verification
 
 ```bash
-npm run verify:sepolia <ADDRESS>  # Verify on Sepolia
-npm run verify:mainnet <ADDRESS>  # Verify on mainnet
+npm run verify:sepolia  # Verify on Sepolia (auto-detects from deployments.json)
+npm run verify:mainnet  # Verify on mainnet (auto-detects from deployments.json)
 ```
 
 ---
@@ -150,8 +150,7 @@ npm run deploy:localhost && \
 
 # Sepolia
 npm run deploy:sepolia && \
-  npm run verify:sepolia <DEPLOYED_ADDRESS> && \
-  CAP_TOKEN_ADDRESS=<DEPLOYED_ADDRESS> \
+  npm run verify:sepolia && \
   POOL_ADDRESS=<POOL_ADDRESS> \
   npm run configure:sepolia
 ```
@@ -229,7 +228,7 @@ curl -X POST -H "Content-Type: application/json" \
 sleep 120
 
 # Try again
-npm run verify:<network> <ADDRESS>
+npm run verify:<network>
 ```
 
 ---

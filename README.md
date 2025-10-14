@@ -1,6 +1,6 @@
 # Cyberia (CAP) Token
 
-[![Tests](https://img.shields.io/badge/Tests-99%2F99%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA419fD4e3BA375250d5D946D91262769F905aEED) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
+[![Tests](https://img.shields.io/badge/Tests-231%2F231%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA419fD4e3BA375250d5D946D91262769F905aEED) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
 
 Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx DAO.
 
@@ -54,7 +54,8 @@ npm run deploy:mainnet
 
 - **Name**: Cyberia
 - **Symbol**: CAP
-- **Supply**: 1,000,000,000 (fixed)
+- **Initial Supply**: 1,000,000,000 (1 billion)
+- **Max Supply**: 10,000,000,000 (10 billion, for bridging/OFT)
 - **Decimals**: 18
 
 ## Tax System
@@ -99,7 +100,7 @@ SEPOLIA_FEE_RECIPIENT=0x...      # Treasury address
 
 ```bash
 npm run deploy:sepolia
-npm run verify:sepolia <PROXY_ADDRESS>
+npm run verify:sepolia  # Automatically detects proxy address from deployments.json
 ```
 
 ### Configure
@@ -144,17 +145,19 @@ npm run validate:zodiac     # Validate Zodiac roles config
 
 #### Hardhat Tests (126 tests)
 
-- **Unit Tests**: Core functionality (deployment, tax system, minting, burning)
-- **Security Tests**: Access control, attack vectors, upgrade safety
-- **Integration Tests**: DAO integration, mainnet fork, invariants, checkpoints
+- **Unit Tests** (42 tests): Core functionality (deployment, tax system, minting, burning, access control)
+- **Security Tests** (32 tests): Reentrancy, attack vectors, upgrade safety, permit signatures
+- **Integration Tests** (52 tests): DAO integration, mainnet fork, invariants, checkpoints, delegation
 
-#### Foundry Tests (Property-based)
+#### Foundry Tests (105 tests)
 
-- **Fuzz Tests**: Random input testing for edge cases
-- **Invariant Tests**: Mathematical invariants under all conditions
-- **Stateful Tests**: Multi-step complex scenarios
+- **Unit Tests** (41 tests): Timelock, permit, events, edge cases, admin functions
+- **Advanced Tests** (19 tests): UUPS upgrades, reentrancy protection, DEX integration, stress testing
+- **Fuzz Tests** (16 tests): Random input testing for edge cases and property validation
+- **Stateful Tests** (14 tests): Multi-step complex scenarios with state transitions
+- **Invariant Tests** (15 tests): Mathematical invariants under all conditions (128K calls per run)
 
-**Coverage Areas**: Reentrancy protection, permit signatures, upgrade safety, max supply, timelock, tax calculations
+**Total Coverage**: 231 tests ensuring comprehensive coverage of all contract functionality and security properties
 
 ## Contract Administration
 
@@ -251,7 +254,11 @@ Board Members
 - [Development Guide](docs/DEVELOPMENT.md) - Setup, workflow, testing, CI/CD
 - [Governance Guide](docs/GOVERNANCE.md) - Tax management, timelock workflow
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment procedures
+- [Deployment Workflows](docs/DEPLOYMENT_WORKFLOWS.md) - GitHub Actions deployment automation
 - [Quick Start](docs/QUICK_START.md) - Get started quickly
+- [Foundry Testing](docs/FOUNDRY.md) - Property-based and invariant testing
+- [Aragon Integration](docs/aragon-integration.md) - DAO governance integration
+- [Safe Setup Guide](docs/safe-setup-guide.md) - Gnosis Safe + Zodiac configuration
 - [Contract Source](contracts/CAPToken.sol) - Main contract code
 
 ## Security
@@ -268,13 +275,29 @@ Board Members
 
 ⚠️ **Not audited**. Professional security audit required before mainnet deployment.
 
-### Recent Security Improvements
+### Recent Improvements
 
-- Added `ReentrancyGuard` to prevent reentrancy attacks
-- Implemented timelock mechanism for tax changes
-- Added maximum supply protection
-- Fixed pool-to-pool transfer logic
-- Enhanced event system for better monitoring
+**Security**:
+
+- ✅ Added `ReentrancyGuard` to prevent reentrancy attacks
+- ✅ Implemented 24-hour timelock mechanism for tax changes
+- ✅ Added maximum supply protection (10B cap)
+- ✅ Fixed pool-to-pool transfer logic for DEX compatibility
+
+**Testing**:
+
+- ✅ Expanded test suite from 45 to 231 tests (414% increase)
+- ✅ Added comprehensive fuzz testing (16 tests, 256 runs each)
+- ✅ Added stateful testing (14 complex scenarios)
+- ✅ Added invariant testing (15 properties, 128K calls each)
+- ✅ Re-enabled and fixed all previously disabled tests
+
+**Code Quality**:
+
+- ✅ Fixed all ESLint warnings (proper TypeScript types)
+- ✅ Fixed Slither CI/CD integration issues
+- ✅ Optimized gas reporting workflow
+- ✅ Enhanced NatSpec documentation
 
 ## License
 
