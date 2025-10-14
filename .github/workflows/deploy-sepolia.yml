@@ -67,6 +67,29 @@ jobs:
             .openzeppelin/sepolia.json
           retention-days: 30
 
+      - name: Update README with deployment info
+        run: npm run update-readme
+
+      - name: Create PR with README update
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update README with Sepolia deployment info"
+          title: "📝 Update README - Sepolia Deployment"
+          body: |
+            ## Sepolia Deployment Complete
+
+            This PR updates the README with Sepolia deployment information.
+
+            **Proxy:** `${{ steps.deployment.outputs.proxy }}`
+            **Implementation:** `${{ steps.deployment.outputs.implementation }}`
+            **Deployed by:** @${{ github.actor }}
+            **Reason:** ${{ github.event.inputs.reason }}
+
+            Merge this to publish the deployment info in the README.
+          branch: sepolia-deployment-${{ github.run_number }}
+          delete-branch: true
+
       - name: Create deployment summary
         run: |
           echo "## 🚀 Sepolia Deployment Complete" >> $GITHUB_STEP_SUMMARY
@@ -81,19 +104,4 @@ jobs:
           echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Integration tests will run automatically" >> $GITHUB_STEP_SUMMARY
-          echo "✅ README will be updated on test success" >> $GITHUB_STEP_SUMMARY
-
-      - name: Trigger integration tests
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'test-sepolia.yml',
-              ref: context.ref,
-              inputs: {
-                deployment_trigger: 'deploy-sepolia'
-              }
-            });
+          echo "✅ README update PR created - review and merge to publish deployment info" >> $GITHUB_STEP_SUMMARY

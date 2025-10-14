@@ -243,7 +243,8 @@ Board Members
 ### Sepolia Testnet
 
 - **Proxy**: [`0xA419fD4e3BA375250d5D946D91262769F905aEED`](https://sepolia.etherscan.io/address/0xA419fD4e3BA375250d5D946D91262769F905aEED)
-- **Status**: Verified ✅
+- **Implementation**: [`0xFb578E80DcaCDe7df1532D5A25f4af2f8e73CBFc`](https://sepolia.etherscan.io/address/0xFb578E80DcaCDe7df1532D5A25f4af2f8e73CBFc)
+- **Status**: Verified ✅ - Deployed 10/13/2025
 
 ### Mainnet
 

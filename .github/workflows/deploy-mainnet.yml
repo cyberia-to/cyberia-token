@@ -172,11 +172,14 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: Update README with deployment info
+        run: npm run update-readme
+
       - name: Create PR for README update
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update mainnet deployment info"
+          commit-message: "chore: update README with mainnet deployment info"
           title: "🚀 Update README with Mainnet Deployment"
           body: |
             ## Mainnet Deployment Complete
