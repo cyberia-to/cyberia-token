@@ -17,10 +17,11 @@ artifacts/
 typechain-types/
 abis/
 
-# Foundry files
+## Foundry files
 forge-out/
 forge-cache/
 broadcast/
+lib/
 
 # Deployment records (contains sensitive deployment data)
 deployments.json
