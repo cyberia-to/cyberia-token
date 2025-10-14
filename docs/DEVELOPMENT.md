@@ -23,12 +23,21 @@ This guide covers the development workflow, tooling, and best practices for cont
 ### Initial Setup
 
 ```bash
-# Clone repository
+# Clone repository with submodules (recommended)
+git clone --recurse-submodules https://github.com/cyberia-to/cyberia-token.git
+cd cyberia-token
+
+# OR if you already cloned without submodules
 git clone https://github.com/cyberia-to/cyberia-token.git
 cd cyberia-token
+git submodule update --init --recursive
 
 # Install dependencies
 npm install
+
+# (Optional) Install Foundry for advanced testing
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
 
 # Copy environment file
 cp .env.example .env
@@ -78,20 +87,27 @@ npm run clean && npm run build
 ### 3. Run Tests
 
 ```bash
-# Run all tests
+# Run all Hardhat tests
 npm test
 
 # Run specific test suites
 npm run test:unit           # Core functionality
 npm run test:security       # Security tests
 npm run test:integration    # DAO integration
-npm run test:edge           # Edge cases
+
+# Run Foundry tests (requires Foundry installation and git submodules)
+npm run test:foundry              # All Foundry tests
+npm run test:foundry:fuzz         # Fuzz testing
+npm run test:foundry:invariant    # Invariant testing
+npm run test:foundry:stateful     # Stateful testing
 
 # Generate coverage report
 npm run test:coverage
+npm run test:foundry:coverage     # Foundry coverage
 
 # Gas usage analysis
 npm run test:gas
+npm run test:foundry:gas          # Foundry gas report
 ```
 
 ### 4. Code Quality Checks
@@ -397,6 +413,19 @@ npm run clean && npm run build
 # Solution: Auto-fix most issues
 npm run lint:fix
 npm run format
+```
+
+**Issue**: Foundry tests fail with "Source forge-std/Test.sol not found"
+
+```bash
+# Solution: Initialize git submodules
+git submodule update --init --recursive
+
+# Verify submodule is present
+ls lib/forge-std/src/Test.sol
+
+# If still failing, reinstall Foundry
+foundryup
 ```
 
 ## Additional Resources

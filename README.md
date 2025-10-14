@@ -16,7 +16,14 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 ## Quick Start
 
 ```bash
-# Install
+# Clone the repository with submodules
+git clone --recurse-submodules https://github.com/cyberia-to/cyberia-token.git
+cd cyberia-token
+
+# OR if you already cloned without --recurse-submodules
+git submodule update --init --recursive
+
+# Install dependencies
 npm install
 
 # Install Foundry (optional, for fuzz/invariant tests)
