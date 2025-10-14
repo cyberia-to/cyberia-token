@@ -210,11 +210,18 @@ capToken.transferOwnership(DAO_ADDRESS);
 
 1. Deploy Safe with board members
 2. Install Zodiac Roles Module
-3. Configure roles for treasury management
+3. Configure roles for treasury management (using [docs/zodiac-roles-config.json](docs/zodiac-roles-config.json))
 4. Validate configuration: `npm run validate:zodiac`
 5. Set Safe as fee recipient
 
-See [Zodiac configuration example](docs/DEPLOYMENT.md#zodiac-roles-configuration).
+**Zodiac Roles Configuration**: The repository includes a production-ready Zodiac Roles policy in [docs/zodiac-roles-config.json](docs/zodiac-roles-config.json) that enforces "Board + DAO" governance rules:
+
+- **BOARD_DAILY_OPS**: Small transfers (<50k CAP) by board members
+- **BOARD_MEDIUM_OPS**: Medium transfers (50k-200k CAP) with higher threshold
+- **DAO_LARGE_OPS**: Large transfers (>200k CAP) require DAO governance approval
+- **DAO_TOKEN_ADMIN**: All token admin functions (taxes, pools, upgrades) restricted to DAO
+
+See [full deployment guide](docs/DEPLOYMENT.md#zodiac-roles-configuration) and [Safe setup guide](docs/safe-setup-guide.md).
 
 ## Architecture
 
