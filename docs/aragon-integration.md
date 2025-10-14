@@ -18,41 +18,45 @@ The CAP token implements ERC-20Votes (EIP-5805) making it fully compatible with 
 
 ```javascript
 // Using Aragon OSx SDK
-import { Client } from '@aragon/sdk-client';
-import { TokenVotingPluginInstall } from '@aragon/sdk-client';
+import { Client } from "@aragon/sdk-client";
+import { TokenVotingPluginInstall } from "@aragon/sdk-client";
 
 const client = new Client({
-  network: 'sepolia',
+  network: "sepolia",
   signer: yourSigner,
 });
 
 // Create DAO with token-voting
 const createDaoParams = {
   daoMetadata: {
-    name: 'Cyberia DAO',
-    description: 'Governance for the Cyberia ecosystem',
-    links: [{
-      name: 'Website',
-      url: 'https://cyberia.example.com'
-    }]
-  },
-  plugins: [{
-    id: 'token-voting.plugin.dao.eth',
-    data: {
-      token: {
-        address: 'CAP_TOKEN_ADDRESS',
-        name: 'Cyberia',
-        symbol: 'CAP'
+    name: "Cyberia DAO",
+    description: "Governance for the Cyberia ecosystem",
+    links: [
+      {
+        name: "Website",
+        url: "https://cyberia.example.com",
       },
-      votingSettings: {
-        votingMode: 'Standard',
-        supportThreshold: 0.5, // 50%
-        minParticipation: 0.15, // 15%
-        minDuration: 86400, // 24 hours
-        minProposerVotingPower: '10000000000000000000000' // 10k CAP
-      }
-    }
-  }]
+    ],
+  },
+  plugins: [
+    {
+      id: "token-voting.plugin.dao.eth",
+      data: {
+        token: {
+          address: "CAP_TOKEN_ADDRESS",
+          name: "Cyberia",
+          symbol: "CAP",
+        },
+        votingSettings: {
+          votingMode: "Standard",
+          supportThreshold: 0.5, // 50%
+          minParticipation: 0.15, // 15%
+          minDuration: 86400, // 24 hours
+          minProposerVotingPower: "10000000000000000000000", // 10k CAP
+        },
+      },
+    },
+  ],
 };
 
 const daoCreation = await client.methods.createDao(createDaoParams);
@@ -67,19 +71,19 @@ const tokenVotingConfig = {
   token: process.env.CAP_TOKEN_ADDRESS,
 
   // Voting mechanics
-  votingMode: 'Standard', // or 'EarlyExecution'
+  votingMode: "Standard", // or 'EarlyExecution'
 
   // Support threshold (percentage of YES votes needed)
-  supportThreshold: '500000', // 50% (in ppm)
+  supportThreshold: "500000", // 50% (in ppm)
 
   // Minimum participation (percentage of total supply that must vote)
-  minParticipation: '150000', // 15% (in ppm)
+  minParticipation: "150000", // 15% (in ppm)
 
   // Minimum voting duration in seconds
   minDuration: 86400, // 24 hours
 
   // Minimum tokens needed to create proposals
-  minProposerVotingPower: '10000000000000000000000' // 10,000 CAP tokens
+  minProposerVotingPower: "10000000000000000000000", // 10,000 CAP tokens
 };
 ```
 
@@ -92,7 +96,7 @@ Once the DAO is created, transfer CAP token ownership:
 const transferOwnershipAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('acceptOwnership', [])
+  data: capTokenInterface.encodeFunctionData("acceptOwnership", []),
 };
 
 // Create proposal in DAO
@@ -100,11 +104,12 @@ const proposalParams = {
   pluginAddress: tokenVotingPluginAddress,
   actions: [transferOwnershipAction],
   metadata: {
-    title: 'Accept CAP Token Ownership',
-    summary: 'Transfer CAP token administrative control to the DAO',
-    description: 'This proposal transfers ownership of the CAP token contract from the deployer to this DAO, enabling governance-controlled administration.',
-    resources: []
-  }
+    title: "Accept CAP Token Ownership",
+    summary: "Transfer CAP token administrative control to the DAO",
+    description:
+      "This proposal transfers ownership of the CAP token contract from the deployer to this DAO, enabling governance-controlled administration.",
+    resources: [],
+  },
 };
 
 const proposal = await client.methods.createProposal(proposalParams);
@@ -119,25 +124,27 @@ const proposal = await client.methods.createProposal(proposalParams);
 const updateTaxesAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('setTaxes', [
-    50,  // 0.5% transfer tax
+  data: capTokenInterface.encodeFunctionData("setTaxes", [
+    50, // 0.5% transfer tax
     150, // 1.5% sell tax
-    0    // 0% buy tax
-  ])
+    0, // 0% buy tax
+  ]),
 };
 
 const taxProposal = {
   pluginAddress: tokenVotingPluginAddress,
   actions: [updateTaxesAction],
   metadata: {
-    title: 'Adjust Tax Rates',
-    summary: 'Reduce transfer tax to 0.5% and increase sell tax to 1.5%',
-    description: 'This proposal adjusts the tax structure to encourage holding while maintaining revenue from sells.',
-    resources: [{
-      name: 'Tax Impact Analysis',
-      url: 'https://docs.cyberia.com/tax-analysis'
-    }]
-  }
+    title: "Adjust Tax Rates",
+    summary: "Reduce transfer tax to 0.5% and increase sell tax to 1.5%",
+    description: "This proposal adjusts the tax structure to encourage holding while maintaining revenue from sells.",
+    resources: [
+      {
+        name: "Tax Impact Analysis",
+        url: "https://docs.cyberia.com/tax-analysis",
+      },
+    ],
+  },
 };
 ```
 
@@ -148,20 +155,20 @@ const taxProposal = {
 const addPoolAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('addPool', [
-    '0x...' // New AMM pair address
-  ])
+  data: capTokenInterface.encodeFunctionData("addPool", [
+    "0x...", // New AMM pair address
+  ]),
 };
 
 const poolProposal = {
   pluginAddress: tokenVotingPluginAddress,
   actions: [addPoolAction],
   metadata: {
-    title: 'Add New AMM Pool',
-    summary: 'Register CAP/USDC pair for tax detection',
-    description: 'Add the new Uniswap V3 CAP/USDC pool to enable proper tax classification for trades.',
-    resources: []
-  }
+    title: "Add New AMM Pool",
+    summary: "Register CAP/USDC pair for tax detection",
+    description: "Add the new Uniswap V3 CAP/USDC pool to enable proper tax classification for trades.",
+    resources: [],
+  },
 };
 ```
 
@@ -172,20 +179,20 @@ const poolProposal = {
 const updateTreasuryAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('setFeeRecipient', [
-    '0x...' // New treasury Safe address
-  ])
+  data: capTokenInterface.encodeFunctionData("setFeeRecipient", [
+    "0x...", // New treasury Safe address
+  ]),
 };
 
 const treasuryProposal = {
   pluginAddress: tokenVotingPluginAddress,
   actions: [updateTreasuryAction],
   metadata: {
-    title: 'Update Treasury Address',
-    summary: 'Point tax fees to new multi-sig treasury',
-    description: 'Update the fee recipient to the new 3-of-5 multi-sig treasury for improved security.',
-    resources: []
-  }
+    title: "Update Treasury Address",
+    summary: "Point tax fees to new multi-sig treasury",
+    description: "Update the fee recipient to the new 3-of-5 multi-sig treasury for improved security.",
+    resources: [],
+  },
 };
 ```
 
@@ -250,14 +257,14 @@ const proposalCount = await tokenVotingPlugin.proposalCount();
 // Monitor active proposals
 const activeProposals = await client.methods.getProposals({
   pluginAddress: tokenVotingPluginAddress,
-  status: 'Active'
+  status: "Active",
 });
 
 // Track voting participation
 for (const proposal of activeProposals) {
   const votes = await client.methods.getProposalVotes({
     proposalId: proposal.id,
-    pluginAddress: tokenVotingPluginAddress
+    pluginAddress: tokenVotingPluginAddress,
   });
 
   console.log(`Proposal ${proposal.id}:`);

@@ -32,7 +32,9 @@ async function deployContract(config: DeployConfig, networkName: string) {
   console.log("🚀 Deploying Cyberia (CAP) Token...");
   console.log(`🌐 Network: ${networkConfig.name} (Chain ID: ${networkConfig.chainId})`);
   console.log(`📋 Owner: ${config.owner}`);
-  console.log(`💰 Fee Recipient: ${config.feeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : config.feeRecipient}`);
+  console.log(
+    `💰 Fee Recipient: ${config.feeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : config.feeRecipient}`
+  );
 
   const [deployer] = await ethers.getSigners();
   console.log(`🔑 Deployer: ${deployer.address}`);
@@ -43,14 +45,10 @@ async function deployContract(config: DeployConfig, networkName: string) {
   const contractFactory = await ethers.getContractFactory("CAPToken");
 
   console.log("\n⏳ Deploying proxy contract...");
-  const contract = await upgrades.deployProxy(
-    contractFactory,
-    [config.owner, config.feeRecipient],
-    {
-      kind: "uups",
-      initializer: "initialize",
-    }
-  );
+  const contract = await upgrades.deployProxy(contractFactory, [config.owner, config.feeRecipient], {
+    kind: "uups",
+    initializer: "initialize",
+  });
 
   await contract.waitForDeployment();
   const proxyAddress = await contract.getAddress();
@@ -160,7 +158,6 @@ async function main() {
       console.log(`   - Transfer ownership to DAO governance when ready`);
       console.log(`   - Set up monitoring and alerts`);
     }
-
   } catch (error) {
     console.error("\n❌ Deployment failed:", error);
     process.exitCode = 1;

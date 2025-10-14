@@ -13,4 +13,3 @@
   "include": ["hardhat.config.ts", "scripts", "test", "typechain-types"],
   "files": ["./hardhat.config.ts"]
 }
-

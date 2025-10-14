@@ -70,9 +70,7 @@ export const NETWORKS: Record<string, NetworkConfig> = {
 export function getNetworkConfig(networkName: string): NetworkConfig {
   const config = NETWORKS[networkName];
   if (!config) {
-    throw new Error(
-      `Unknown network: ${networkName}. Supported: ${Object.keys(NETWORKS).join(", ")}`
-    );
+    throw new Error(`Unknown network: ${networkName}. Supported: ${Object.keys(NETWORKS).join(", ")}`);
   }
   return config;
 }
@@ -83,10 +81,8 @@ export function getDeploymentConfig(networkName: string): DeploymentConfig {
   // For localhost, use default test values
   if (networkName === "localhost") {
     return {
-      owner: process.env.LOCALHOST_OWNER_ADDRESS ||
-             "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // Default Hardhat account #0
-      feeRecipient: process.env.LOCALHOST_FEE_RECIPIENT ||
-                   "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", // Default Hardhat account #1
+      owner: process.env.LOCALHOST_OWNER_ADDRESS || "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // Default Hardhat account #0
+      feeRecipient: process.env.LOCALHOST_FEE_RECIPIENT || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", // Default Hardhat account #1
     };
   }
 
@@ -116,9 +112,7 @@ export function validateEnvironment(networkName: string): void {
   const config = getNetworkConfig(networkName);
 
   if (networkName !== "localhost" && !config.rpcUrl) {
-    throw new Error(
-      `RPC URL not configured for ${networkName}. Set ${networkName.toUpperCase()}_RPC_URL in .env`
-    );
+    throw new Error(`RPC URL not configured for ${networkName}. Set ${networkName.toUpperCase()}_RPC_URL in .env`);
   }
 
   if (networkName === "mainnet") {

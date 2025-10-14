@@ -15,6 +15,12 @@ yarn-error.log*
 cache/
 artifacts/
 typechain-types/
+abis/
+
+# Foundry files
+forge-out/
+forge-cache/
+broadcast/
 
 # Deployment records (contains sensitive deployment data)
 deployments.json
@@ -109,6 +115,7 @@ temp/
 # Editor directories and files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

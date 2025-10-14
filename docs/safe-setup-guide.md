@@ -5,6 +5,7 @@ This guide explains how to set up a Gnosis Safe with Zodiac Roles module for Cyb
 ## Overview
 
 The recommended architecture provides:
+
 - **Board Operations**: Daily operations up to 50k CAP
 - **Medium Operations**: Transfers 50k-200k CAP (higher threshold)
 - **DAO Oversight**: Large transfers >200k CAP require governance
@@ -43,31 +44,31 @@ The recommended architecture provides:
 Visit [Safe App](https://app.safe.global) or use Safe SDK:
 
 ```javascript
-import Safe, { EthersAdapter } from '@safe-global/sdk-starter-kit';
+import Safe, { EthersAdapter } from "@safe-global/sdk-starter-kit";
 
 const ethAdapter = new EthersAdapter({
   ethers,
-  signerOrProvider: signer
+  signerOrProvider: signer,
 });
 
 const safeAccountConfig = {
   owners: [
-    '0x1234567890123456789012345678901234567890', // Board member 1
-    '0x2345678901234567890123456789012345678901', // Board member 2
-    '0x3456789012345678901234567890123456789012', // Board member 3
-    '0x4567890123456789012345678901234567890123', // Board member 4
-    '0x5678901234567890123456789012345678901234'  // Board member 5
+    "0x1234567890123456789012345678901234567890", // Board member 1
+    "0x2345678901234567890123456789012345678901", // Board member 2
+    "0x3456789012345678901234567890123456789012", // Board member 3
+    "0x4567890123456789012345678901234567890123", // Board member 4
+    "0x5678901234567890123456789012345678901234", // Board member 5
   ],
   threshold: 3, // 3-of-5 for board operations
 };
 
 const safeSdk = await Safe.create({
   ethAdapter,
-  safeAccountConfig
+  safeAccountConfig,
 });
 
 const safeAddress = await safeSdk.getAddress();
-console.log('Safe deployed at:', safeAddress);
+console.log("Safe deployed at:", safeAddress);
 ```
 
 ### 1.2 Fund Safe
@@ -87,6 +88,7 @@ cast send $SAFE_ADDRESS --value 1ether
 ### 2.1 Enable Roles Module
 
 Using Safe UI:
+
 1. Go to Safe Apps → Zodiac
 2. Select "Roles Modifier"
 3. Click "Add Module"
@@ -95,7 +97,7 @@ Using Safe UI:
 Using Safe SDK:
 
 ```javascript
-const ROLES_MOD_MASTERCOPY = '0x1ffAdc16726dd4F91fF275b4bF50651801B06a86'; // Sepolia
+const ROLES_MOD_MASTERCOPY = "0x1ffAdc16726dd4F91fF275b4bF50651801B06a86"; // Sepolia
 
 const enableModuleTx = await safeSdk.createEnableModuleTx(ROLES_MOD_MASTERCOPY);
 const txResponse = await safeSdk.executeTransaction(enableModuleTx);
@@ -104,24 +106,24 @@ const txResponse = await safeSdk.executeTransaction(enableModuleTx);
 ### 2.2 Deploy Roles Instance
 
 ```javascript
-import { deployAndSetUpModule } from '@gnosis.pm/zodiac';
+import { deployAndSetUpModule } from "@gnosis.pm/zodiac";
 
 const rolesModuleDeployment = await deployAndSetUpModule(
-  'roles',
+  "roles",
   {
-    types: ['address', 'address', 'address'],
+    types: ["address", "address", "address"],
     values: [
-      safeAddress,    // owner (Safe)
-      safeAddress,    // avatar (Safe)
-      safeAddress     // target (Safe)
-    ]
+      safeAddress, // owner (Safe)
+      safeAddress, // avatar (Safe)
+      safeAddress, // target (Safe)
+    ],
   },
   provider,
-  Number(await provider.getNetwork().then(n => n.chainId)),
+  Number(await provider.getNetwork().then((n) => n.chainId)),
   Date.now().toString()
 );
 
-console.log('Roles module deployed at:', rolesModuleDeployment.address);
+console.log("Roles module deployed at:", rolesModuleDeployment.address);
 ```
 
 ## Step 3: Configure Roles
@@ -135,15 +137,35 @@ console.log('Roles module deployed at:', rolesModuleDeployment.address);
    - `{{ARAGON_DAO_ADDRESS}}` → Aragon DAO address
 3. Update board member addresses in the config
 
-### 3.2 Apply Configuration
+### 3.2 Validate Configuration
+
+Before applying, validate the configuration:
+
+```bash
+# Validate with default path (docs/zodiac-roles-config.json)
+npm run validate:zodiac
+
+# Or specify custom path
+ZODIAC_CONFIG_PATH=/path/to/config.json npm run validate:zodiac
+```
+
+The validator checks:
+
+- All template variables are replaced
+- All addresses are valid Ethereum addresses
+- Required fields are present
+- Role structure is correct
+
+### 3.3 Apply Configuration
 
 Using Zodiac interface:
+
 1. Go to Safe Apps → Zodiac → Roles
 2. Click "Import Configuration"
 3. Upload the modified JSON file
 4. Review and confirm transactions
 
-### 3.3 Manual Role Setup (Alternative)
+### 3.4 Manual Role Setup (Alternative)
 
 If importing doesn't work, set up roles manually:
 
@@ -163,11 +185,11 @@ await rolesModule.scopeTarget(
 await rolesModule.scopeFunction(
   1, // role ID
   capTokenAddress,
-  '0xa9059cbb', // transfer(address,uint256)
+  "0xa9059cbb", // transfer(address,uint256)
   [true, true], // paramTypesCompared
   [ParameterType.Static, ParameterType.Dynamic], // paramTypes
   [Comparison.OneOf, Comparison.LessThan], // paramComparisons
-  [approvedRecipients, ethers.utils.parseEther('50000')] // paramValues
+  [approvedRecipients, ethers.utils.parseEther("50000")] // paramValues
 );
 ```
 
@@ -194,10 +216,7 @@ cast send $SAFE_ADDRESS "execTransactionFromModule(address,uint256,bytes,uint8)"
 const transferTx = {
   to: capTokenAddress,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('transfer', [
-    recipientAddress,
-    ethers.utils.parseEther('100000')
-  ])
+  data: capTokenInterface.encodeFunctionData("transfer", [recipientAddress, ethers.utils.parseEther("100000")]),
 };
 
 // Requires 3 board member signatures
@@ -216,10 +235,10 @@ Large transfers should require DAO proposal:
 const largeTx = {
   to: treasuryAddress,
   value: 0,
-  data: treasuryInterface.encodeFunctionData('transfer', [
+  data: treasuryInterface.encodeFunctionData("transfer", [
     recipientAddress,
-    ethers.utils.parseEther('500000') // >200k limit
-  ])
+    ethers.utils.parseEther("500000"), // >200k limit
+  ]),
 };
 
 // Create DAO proposal instead
@@ -227,8 +246,8 @@ const daoProposal = {
   actions: [largeTx],
   metadata: {
     title: "Large Treasury Transfer",
-    description: "Transfer 500k CAP for strategic partnership"
-  }
+    description: "Transfer 500k CAP for strategic partnership",
+  },
 };
 ```
 
@@ -242,7 +261,7 @@ Via DAO proposal:
 const setFeeRecipientAction = {
   to: capTokenAddress,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('setFeeRecipient', [safeAddress])
+  data: capTokenInterface.encodeFunctionData("setFeeRecipient", [safeAddress]),
 };
 
 // Submit as DAO proposal
@@ -256,7 +275,7 @@ Transfer CAP token ownership to Aragon DAO:
 const transferOwnershipAction = {
   to: capTokenAddress,
   value: 0,
-  data: capTokenInterface.encodeFunctionData('transferOwnership', [aragonDaoAddress])
+  data: capTokenInterface.encodeFunctionData("transferOwnership", [aragonDaoAddress]),
 };
 
 // Submit as DAO proposal

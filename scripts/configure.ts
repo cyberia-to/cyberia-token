@@ -10,7 +10,7 @@ interface ConfigOptions {
     transfer: number;
     sell: number;
     buy: number;
-  }
+  };
 }
 
 async function validateConfig(networkName: string): Promise<ConfigOptions> {
@@ -26,7 +26,7 @@ async function validateConfig(networkName: string): Promise<ConfigOptions> {
     } else {
       throw new Error(
         `CAP_TOKEN_ADDRESS not set and no deployment found for ${networkName}. ` +
-        `Please set CAP_TOKEN_ADDRESS in .env or deploy first.`
+          `Please set CAP_TOKEN_ADDRESS in .env or deploy first.`
       );
     }
   }
@@ -43,7 +43,11 @@ async function validateConfig(networkName: string): Promise<ConfigOptions> {
     throw new Error(`Invalid POOL_ADDRESS: ${poolAddress}`);
   }
 
-  if (newFeeRecipient && newFeeRecipient !== "0x0000000000000000000000000000000000000000" && !ethers.isAddress(newFeeRecipient)) {
+  if (
+    newFeeRecipient &&
+    newFeeRecipient !== "0x0000000000000000000000000000000000000000" &&
+    !ethers.isAddress(newFeeRecipient)
+  ) {
     throw new Error(`Invalid NEW_FEE_RECIPIENT: ${newFeeRecipient}`);
   }
 
@@ -97,7 +101,9 @@ async function updateFeeRecipient(contract: any, newFeeRecipient: string) {
     return;
   }
 
-  console.log(`📝 Updating fee recipient to: ${newFeeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : newFeeRecipient}`);
+  console.log(
+    `📝 Updating fee recipient to: ${newFeeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : newFeeRecipient}`
+  );
 
   const tx = await contract.setFeeRecipient(newFeeRecipient);
   console.log(`⏳ Transaction submitted: ${tx.hash}`);
@@ -107,7 +113,9 @@ async function updateFeeRecipient(contract: any, newFeeRecipient: string) {
 }
 
 async function updateTaxes(contract: any, taxes: { transfer: number; sell: number; buy: number }) {
-  console.log(`📝 Updating taxes to: ${taxes.transfer / 100}% transfer, ${taxes.sell / 100}% sell, ${taxes.buy / 100}% buy`);
+  console.log(
+    `📝 Updating taxes to: ${taxes.transfer / 100}% transfer, ${taxes.sell / 100}% sell, ${taxes.buy / 100}% buy`
+  );
 
   // Validate tax ranges
   if (taxes.transfer > 500 || taxes.sell > 500 || taxes.buy > 500) {
@@ -137,7 +145,9 @@ async function displayCurrentConfig(contract: any, options: ConfigOptions) {
   console.log(`Transfer Tax: ${Number(transferTax) / 100}% (${transferTax} bp)`);
   console.log(`Sell Tax: ${Number(sellTax) / 100}% (${sellTax} bp)`);
   console.log(`Buy Tax: ${Number(buyTax) / 100}% (${buyTax} bp)`);
-  console.log(`Fee Recipient: ${feeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : feeRecipient}`);
+  console.log(
+    `Fee Recipient: ${feeRecipient === "0x0000000000000000000000000000000000000000" ? "Burn Mode" : feeRecipient}`
+  );
 
   if (options.poolAddress) {
     const isPool = await contract.isPool(options.poolAddress);
@@ -208,7 +218,6 @@ async function main() {
       console.log(`   - Update DAO documentation`);
       console.log(`   - Notify team members`);
     }
-
   } catch (error) {
     console.error("\n❌ Configuration failed:", error);
     process.exitCode = 1;

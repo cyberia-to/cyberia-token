@@ -165,11 +165,11 @@ npm run configure:localhost
 
 Hardhat provides 20 pre-funded accounts. The first few are:
 
-| Account | Address | Private Key | Initial Balance |
-|---------|---------|-------------|-----------------|
-| #0 (Deployer) | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` | `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` | 10,000 ETH |
-| #1 | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | `0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d` | 10,000 ETH |
-| #2 | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | `0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a` | 10,000 ETH |
+| Account       | Address                                      | Private Key                                                          | Initial Balance |
+| ------------- | -------------------------------------------- | -------------------------------------------------------------------- | --------------- |
+| #0 (Deployer) | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` | `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` | 10,000 ETH      |
+| #1            | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | `0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d` | 10,000 ETH      |
+| #2            | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | `0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a` | 10,000 ETH      |
 
 ---
 
@@ -210,6 +210,7 @@ npm run deploy:sepolia
 ```
 
 This will:
+
 - Display deployment configuration
 - Deploy the UUPS proxy and implementation
 - Mint 1B CAP tokens to the owner
@@ -248,6 +249,7 @@ https://sepolia.etherscan.io/address/<YOUR_PROXY_ADDRESS>
 ```
 
 Verify:
+
 - ✅ Contract is verified (green checkmark)
 - ✅ Owner is correct
 - ✅ Total supply is 1,000,000,000 CAP
@@ -281,6 +283,7 @@ Before deploying to mainnet, verify:
    - Check current gas prices: [ETH Gas Station](https://ethgasstation.info/)
 
 2. **Production Configuration:**
+
    ```env
    MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
    PRIVATE_KEY=your_secure_production_key
@@ -316,6 +319,7 @@ npm run deploy:mainnet
 ```
 
 **Monitor the deployment:**
+
 - Transaction hash will be displayed
 - Wait for confirmations (5 blocks for mainnet)
 - Save all output for records
@@ -342,6 +346,7 @@ npm run configure:mainnet
 #### Step 5: Post-Deployment Actions
 
 1. **Verify Deployment:**
+
    ```
    https://etherscan.io/address/<YOUR_PROXY_ADDRESS>
    ```
@@ -391,6 +396,7 @@ npm run configure:mainnet    # For mainnet
 ```
 
 **How it works:**
+
 1. Script checks for `CAP_TOKEN_ADDRESS` in `.env`
 2. If not found, reads from `deployments.json` for current network
 3. Uses the correct address automatically
@@ -437,11 +443,13 @@ npx hardhat verify --network <network> <PROXY_ADDRESS>
 If verification fails:
 
 1. **Check the implementation contract:**
+
    ```bash
    npx hardhat verify --network <network> <IMPLEMENTATION_ADDRESS>
    ```
 
 2. **Verify with constructor arguments** (if needed):
+
    ```bash
    npx hardhat verify --network <network> <ADDRESS> "arg1" "arg2"
    ```
@@ -496,6 +504,7 @@ The configuration script automatically reads from `deployments.json` if `CAP_TOK
 **Problem:** Not enough ETH in deployer wallet.
 
 **Solution:**
+
 ```bash
 # Check balance
 npx hardhat run scripts/check-balance.ts --network <network>
@@ -509,6 +518,7 @@ npx hardhat run scripts/check-balance.ts --network <network>
 **Problem:** Transaction nonce is out of sync.
 
 **Solution:**
+
 ```bash
 # Reset Hardhat network
 npm run clean
@@ -523,6 +533,7 @@ npm run build
 **Problem:** RPC URL not configured.
 
 **Solution:**
+
 - Check `.env` file has correct RPC URL
 - Verify API key is active
 - Test RPC endpoint: `curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' <RPC_URL>`
@@ -532,6 +543,7 @@ npm run build
 **Problem:** Private key not configured correctly.
 
 **Solution:**
+
 - Ensure `PRIVATE_KEY` in `.env` includes the `0x` prefix
 - Key should be 66 characters (0x + 64 hex characters)
 - For localhost, leave blank to use default accounts
@@ -541,6 +553,7 @@ npm run build
 **Problem:** Etherscan verification unsuccessful.
 
 **Solution:**
+
 - Wait 1-2 minutes after deployment
 - Ensure `ETHERSCAN_API_KEY` is set
 - Try verifying the implementation contract directly
@@ -551,6 +564,7 @@ npm run build
 **Problem:** Owner address not set or invalid.
 
 **Solution:**
+
 ```bash
 # Check .env has proper configuration
 # For localhost: LOCALHOST_OWNER_ADDRESS
@@ -582,15 +596,15 @@ npx hardhat --verbose run --network <network> scripts/deploy.ts
 
 ## Environment Comparison
 
-| Feature | Localhost | Sepolia | Mainnet |
-|---------|-----------|---------|---------|
-| **Cost** | Free | Free (test ETH) | Real ETH required |
-| **Speed** | Instant | ~12 seconds/block | ~12 seconds/block |
-| **Persistence** | Temporary | Permanent | Permanent |
-| **Verification** | Not available | Available | Available |
-| **Purpose** | Development/Testing | Integration Testing | Production |
-| **Reset** | Easy | Cannot reset | Cannot reset |
-| **Risk** | None | None | High (real value) |
+| Feature          | Localhost           | Sepolia             | Mainnet           |
+| ---------------- | ------------------- | ------------------- | ----------------- |
+| **Cost**         | Free                | Free (test ETH)     | Real ETH required |
+| **Speed**        | Instant             | ~12 seconds/block   | ~12 seconds/block |
+| **Persistence**  | Temporary           | Permanent           | Permanent         |
+| **Verification** | Not available       | Available           | Available         |
+| **Purpose**      | Development/Testing | Integration Testing | Production        |
+| **Reset**        | Easy                | Cannot reset        | Cannot reset      |
+| **Risk**         | None                | None                | High (real value) |
 
 ---
 
@@ -606,6 +620,7 @@ npx hardhat --verbose run --network <network> scripts/deploy.ts
 ## Support
 
 For issues or questions:
+
 1. Check this guide thoroughly
 2. Review the main [README.md](../README.md)
 3. Check existing GitHub issues

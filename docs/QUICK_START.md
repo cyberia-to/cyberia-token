@@ -258,10 +258,10 @@ npm run verify:<network> <ADDRESS>
 
 ## 🔗 Quick Links
 
-| Network | Explorer | Faucet |
-|---------|----------|--------|
+| Network | Explorer                                             | Faucet                                          |
+| ------- | ---------------------------------------------------- | ----------------------------------------------- |
 | Sepolia | [sepolia.etherscan.io](https://sepolia.etherscan.io) | [sepoliafaucet.com](https://sepoliafaucet.com/) |
-| Mainnet | [etherscan.io](https://etherscan.io) | N/A |
+| Mainnet | [etherscan.io](https://etherscan.io)                 | N/A                                             |
 
 ---
 

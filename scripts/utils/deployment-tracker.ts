@@ -33,7 +33,7 @@ export function loadDeployments(): DeploymentsFile {
   try {
     const data = readFileSync(DEPLOYMENTS_FILE, "utf8");
     return JSON.parse(data);
-  } catch (error) {
+  } catch {
     console.warn("Warning: Could not read deployments.json, starting fresh");
     return {
       version: "1.0.0",
@@ -46,11 +46,7 @@ export function saveDeployment(network: string, record: DeploymentRecord): void 
   const deployments = loadDeployments();
   deployments.deployments[network] = record;
 
-  writeFileSync(
-    DEPLOYMENTS_FILE,
-    JSON.stringify(deployments, null, 2) + "\n",
-    "utf8"
-  );
+  writeFileSync(DEPLOYMENTS_FILE, JSON.stringify(deployments, null, 2) + "\n", "utf8");
 
   console.log(`\n✅ Deployment record saved to deployments.json`);
 }

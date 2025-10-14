@@ -1,0 +1,12 @@
+node_modules
+artifacts
+cache
+coverage
+typechain-types
+dist
+.openzeppelin
+*.log
+*.json
+!package.json
+!tsconfig.json
+!.prettierrc.json

@@ -13,7 +13,9 @@ contract OFTAdapterStub is Initializable, OwnableUpgradeable, UUPSUpgradeable, I
 	event OFTReceived(address indexed from, uint256 amount, bytes data);
 
 	/// @custom:oz-upgrades-unsafe-allow constructor
-	constructor() { _disableInitializers(); }
+	constructor() {
+		_disableInitializers();
+	}
 
 	function initialize(address owner_) public initializer {
 		__Ownable_init(owner_);
@@ -28,4 +30,3 @@ contract OFTAdapterStub is Initializable, OwnableUpgradeable, UUPSUpgradeable, I
 	// UUPS authorization
 	function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
-
