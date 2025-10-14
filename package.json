@@ -50,6 +50,7 @@
     "test:foundry:stateful": "forge test --match-path test/foundry/CAPToken.stateful.t.sol",
     "test:foundry:coverage": "forge coverage",
     "test:foundry:gas": "forge test --gas-report",
+    "size": "hardhat size-contracts",
     "node": "hardhat node",
     "deploy:sepolia": "hardhat run --network sepolia scripts/deploy.ts",
     "deploy:mainnet": "hardhat run --network mainnet scripts/deploy.ts",

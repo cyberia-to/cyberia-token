@@ -86,20 +86,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Compile contracts with Hardhat (for Foundry)
+        run: npm run build
+
       - name: Run Foundry tests
-        run: npm run test:foundry
+        run: forge test -vvv
 
       - name: Run Foundry fuzz tests
-        run: npm run test:foundry:fuzz
+        run: forge test --match-path test/foundry/CAPToken.fuzz.t.sol -vvv
 
       - name: Run Foundry invariant tests
-        run: npm run test:foundry:invariant
+        run: forge test --match-path test/foundry/CAPToken.invariant.t.sol -vvv
 
       - name: Run Foundry stateful tests
-        run: npm run test:foundry:stateful
+        run: forge test --match-path test/foundry/CAPToken.stateful.t.sol -vvv
 
       - name: Generate Foundry gas report
-        run: npm run test:foundry:gas
+        run: forge test --gas-report
 
   coverage:
     name: Coverage
