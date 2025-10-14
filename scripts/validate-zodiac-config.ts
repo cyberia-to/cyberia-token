@@ -2,12 +2,17 @@ import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
 
+interface ZodiacTarget {
+  address?: string;
+  [key: string]: unknown;
+}
+
 interface ZodiacRole {
   key: string;
   name: string;
   description: string;
   members: string[];
-  targets: any[];
+  targets: ZodiacTarget[];
 }
 
 interface ZodiacConfig {
@@ -20,7 +25,7 @@ interface ZodiacConfig {
   };
   createdAt: number;
   roles: ZodiacRole[];
-  scopeConfig: any;
+  scopeConfig: Record<string, unknown>;
 }
 
 const TEMPLATE_VARIABLES = ["{{TREASURY_SAFE_ADDRESS}}", "{{CAP_TOKEN_ADDRESS}}", "{{ARAGON_DAO_ADDRESS}}"];

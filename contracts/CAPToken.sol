@@ -28,7 +28,8 @@ contract CAPToken is
 	uint256 public constant TAX_CHANGE_DELAY = 24 hours; // Timelock delay for tax changes
 
 	// Tax parameters (in basis points)
-	uint256 public transferTaxBp; // applied to non-pool <-> non-pool transfers and to sells in addition to sellTaxBp if desired (hybrid rule below)
+	// transferTaxBp: applied to non-pool <-> non-pool transfers and to sells in addition to sellTaxBp (hybrid rule)
+	uint256 public transferTaxBp;
 	uint256 public sellTaxBp; // additional tax when user -> pool
 	uint256 public buyTaxBp; // applied when pool -> user (set to 0 by default)
 

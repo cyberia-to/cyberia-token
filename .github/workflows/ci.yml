@@ -127,6 +127,10 @@ jobs:
   slither:
     name: Slither Analysis
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -137,14 +141,13 @@ jobs:
         with:
           node-version: '20.19.5'
           solc-version: '0.8.24'
-          slither-version: 'latest'
           fail-on: none
           slither-args: '--filter-paths "node_modules|test" --exclude naming-convention,solc-version,timestamp'
         continue-on-error: true
 
-      - name: Create SARIF file
+      - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: steps.slither.outputs.sarif != ''
         with:
           sarif_file: ${{ steps.slither.outputs.sarif }}
         continue-on-error: true

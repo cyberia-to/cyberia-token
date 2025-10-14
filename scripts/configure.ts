@@ -1,6 +1,7 @@
 import { ethers, network } from "hardhat";
 import { getNetworkConfig } from "./config/environments";
 import { getDeployment } from "./utils/deployment-tracker";
+import type { CAPToken } from "../typechain-types";
 
 interface ConfigOptions {
   contractAddress: string;
@@ -76,7 +77,7 @@ async function getContractInstance(address: string) {
   }
 }
 
-async function addPool(contract: any, poolAddress: string) {
+async function addPool(contract: CAPToken, poolAddress: string) {
   console.log(`📝 Adding pool: ${poolAddress}`);
 
   // Check if pool is already added
@@ -93,7 +94,7 @@ async function addPool(contract: any, poolAddress: string) {
   console.log("✅ Pool added successfully");
 }
 
-async function updateFeeRecipient(contract: any, newFeeRecipient: string) {
+async function updateFeeRecipient(contract: CAPToken, newFeeRecipient: string) {
   const currentRecipient = await contract.feeRecipient();
 
   if (currentRecipient === newFeeRecipient) {
@@ -112,7 +113,7 @@ async function updateFeeRecipient(contract: any, newFeeRecipient: string) {
   console.log("✅ Fee recipient updated successfully");
 }
 
-async function updateTaxes(contract: any, taxes: { transfer: number; sell: number; buy: number }) {
+async function updateTaxes(contract: CAPToken, taxes: { transfer: number; sell: number; buy: number }) {
   console.log(
     `📝 Updating taxes to: ${taxes.transfer / 100}% transfer, ${taxes.sell / 100}% sell, ${taxes.buy / 100}% buy`
   );
@@ -129,7 +130,7 @@ async function updateTaxes(contract: any, taxes: { transfer: number; sell: numbe
   console.log("✅ Taxes updated successfully");
 }
 
-async function displayCurrentConfig(contract: any, options: ConfigOptions) {
+async function displayCurrentConfig(contract: CAPToken, options: ConfigOptions) {
   console.log("\n=== Current Configuration ===");
 
   const [transferTax, sellTax, buyTax, feeRecipient, owner] = await Promise.all([

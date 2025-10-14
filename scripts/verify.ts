@@ -40,7 +40,7 @@ async function getAddressesToVerify(networkName: string): Promise<{ proxy: strin
 
 async function verifyContract(
   contractAddress: string,
-  constructorArguments: any[] = [],
+  constructorArguments: unknown[] = [],
   contractName?: string
 ): Promise<boolean> {
   try {
@@ -53,15 +53,16 @@ async function verifyContract(
 
     console.log(`✅ ${contractName || "Contract"} verified successfully!`);
     return true;
-  } catch (error: any) {
-    if (error.message.includes("Already Verified")) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("Already Verified")) {
       console.log(`✅ ${contractName || "Contract"} already verified!`);
       return true;
-    } else if (error.message.includes("does not have bytecode")) {
+    } else if (errorMessage.includes("does not have bytecode")) {
       console.error(`❌ No contract found at address ${contractAddress}`);
       return false;
     } else {
-      console.error(`❌ Verification failed for ${contractName || "contract"}:`, error.message);
+      console.error(`❌ Verification failed for ${contractName || "contract"}:`, errorMessage);
       return false;
     }
   }
