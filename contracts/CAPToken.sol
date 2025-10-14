@@ -56,6 +56,9 @@ contract CAPToken is
 		_disableInitializers();
 	}
 
+	/// @notice Initialize the token contract
+	/// @param _owner The initial owner address (typically the DAO governance contract)
+	/// @param _feeRecipient The fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected
 	function initialize(address _owner, address _feeRecipient) public initializer {
 		__ERC20_init("Cyberia", "CAP");
 		__ERC20Permit_init("Cyberia");
@@ -122,6 +125,8 @@ contract CAPToken is
 		emit TaxesUpdated(_transferTaxBp, _sellTaxBp, _buyTaxBp);
 	}
 
+	/// @notice Update the fee recipient address
+	/// @param _feeRecipient The new fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected
 	function setFeeRecipient(address _feeRecipient) external onlyOwner {
 		address oldRecipient = feeRecipient;
 		feeRecipient = _feeRecipient; // zero address enables burn mode
