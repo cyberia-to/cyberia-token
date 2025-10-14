@@ -20,6 +20,7 @@ contract CAPTokenHandler is Test {
 	uint256 public ghost_mintSum;
 	uint256 public ghost_burnSum;
 	uint256 public ghost_transferCount;
+	uint256 public ghost_taxBurnedSum; // Track taxes burned in burn mode
 
 	// Arrays to track actors for balance summation
 	address[] public actors;
@@ -150,12 +151,10 @@ contract CAPTokenHandler is Test {
 		}
 
 		// Create new actor
-		address newActor = makeAddr(string(abi.encodePacked("actor", index)));
+		address newActor = makeAddr(string(abi.encodePacked("actor", vm.toString(actors.length))));
 
-		// Give initial tokens from initial supply
-		if (token.balanceOf(address(this)) > 0) {
-			token.transfer(newActor, token.balanceOf(address(this)) / 20);
-		}
+		// Don't give initial tokens here - let mint/transfer operations distribute naturally
+		// This avoids accounting issues with ghost variables
 
 		actors.push(newActor);
 		isActor[newActor] = true;
@@ -214,10 +213,9 @@ contract CAPTokenInvariantTest is StdInvariant, Test {
 		// Deploy handler
 		handler = new CAPTokenHandler(token, feeRecipient);
 
-		// Give handler initial tokens for distribution
-		// After tax (1%), handler receives 99% of 75% = 74.25%
-		uint256 amountToSend = (INITIAL_SUPPLY * 3) / 4;
-		token.transfer(address(handler), amountToSend);
+		// Give handler ALL initial tokens to have clean accounting
+		// Owner retains 0, handler has all supply, making balance tracking simpler
+		token.transfer(address(handler), token.balanceOf(owner));
 
 		// Target handler for invariant testing
 		targetContract(address(handler));
@@ -249,31 +247,28 @@ contract CAPTokenInvariantTest is StdInvariant, Test {
 	}
 
 	/// @notice INV3: Sum of all balances should equal total supply
-	/// @dev Note: This invariant is challenging in stateful fuzzing with dynamic actor creation
-	/// The handler dynamically creates actors and distributes tokens from its balance during _getActor calls.
-	/// With complex sequences involving mint (which creates actors) + transfers (which also create actors),
-	/// the timing of actor creation vs token distribution can cause temporary accounting discrepancies.
-	/// This is a known limitation of the test design, not the token contract itself.
-	/// INV4 (supply accounting) and INV5 (no balance exceeds supply) provide better guarantees.
+	/// @dev With the redesigned handler that doesn't distribute tokens during actor creation,
+	/// and with owner having 0 balance, we can now properly verify this invariant.
 	function invariant_balanceSumEqualsTotalSupply() public view {
-		// Disabled due to complex actor creation accounting in stateful fuzzing
-		// See INV4 and INV5 for supply integrity checks
-		assertTrue(true, "INV3: Skipped - complex actor accounting in stateful fuzzing");
-
-		/*
 		uint256 sumOfBalances = handler.getSumOfBalances();
 		sumOfBalances += token.balanceOf(owner);
 		uint256 totalSupply = token.totalSupply();
-		assertApproxEqAbs(sumOfBalances, totalSupply, 1e27, "INV3: Sum of balances != total supply");
-		*/
+
+		// Allow small rounding error for tax calculations (at most a few wei per transfer)
+		assertApproxEqAbs(sumOfBalances, totalSupply, handler.ghost_transferCount() + 1, "INV3: Sum of balances != total supply");
 	}
 
-	/// @notice INV4: Total supply should equal initial + minted - burned
+	/// @notice INV4: Total supply should equal initial + minted - burned (including tax burns)
+	/// @dev Tax burns reduce supply when feeRecipient is address(0)
 	function invariant_supplyAccountingCorrect() public view {
 		uint256 expectedSupply = INITIAL_SUPPLY + handler.ghost_mintSum() - handler.ghost_burnSum();
 		uint256 actualSupply = token.totalSupply();
 
-		// Allow for small rounding differences due to tax burns
+		// If in burn mode, actual supply may be less due to tax burns
+		// Otherwise, they should be approximately equal (allow for rounding)
+		assertLe(actualSupply, expectedSupply, "INV4: Supply exceeds expected");
+
+		// Allow reasonable tolerance for tax calculation rounding
 		assertApproxEqAbs(actualSupply, expectedSupply, 1e18, "INV4: Supply accounting incorrect");
 	}
 
@@ -331,7 +326,7 @@ contract CAPTokenInvariantTest is StdInvariant, Test {
 	/// @notice INV9: Total voting power should never exceed circulating supply
 	/// @dev Note: This invariant can be violated during delegation due to checkpoint timing
 	/// Disabled for now as it's a known edge case in stateful testing with complex delegation
-	function invariant_votingPowerNeverExceedsSupply() public view {
+	function invariant_votingPowerNeverExceedsSupply() public pure {
 		// Skip this test for now - complex delegation scenarios can temporarily violate this
 		// due to checkpoint recording timing in fuzz testing
 		assertTrue(true, "INV9: Skipped - known limitation with stateful delegation testing");
@@ -354,7 +349,7 @@ contract CAPTokenInvariantTest is StdInvariant, Test {
 	}
 
 	/// @notice INV10: Delegation should not change token balance
-	function invariant_delegationDoesNotChangeBalance() public view {
+	function invariant_delegationDoesNotChangeBalance() public pure {
 		// This is tested indirectly through INV3 - if delegation changed balances,
 		// the sum would not equal total supply
 		assertTrue(true, "INV10: Delegation preserves balances (tested via INV3)");
@@ -374,14 +369,14 @@ contract CAPTokenInvariantTest is StdInvariant, Test {
   //////////////////////////////////////////////////////////////*/
 
 	/// @notice INV12: Tokens cannot be created out of thin air
-	function invariant_noTokenCreationExceptMint() public view {
+	function invariant_noTokenCreationExceptMint() public pure {
 		// Total supply should only increase via mint (tracked in ghost_mintSum)
 		// This is verified by INV4
 		assertTrue(true, "INV12: Token creation controlled (verified by INV4)");
 	}
 
 	/// @notice INV13: Tokens cannot disappear except via burn
-	function invariant_noTokenLossExceptBurn() public view {
+	function invariant_noTokenLossExceptBurn() public pure {
 		// This is verified by INV3 and INV4 together
 		assertTrue(true, "INV13: Token conservation maintained (verified by INV3+INV4)");
 	}
@@ -391,7 +386,7 @@ contract CAPTokenInvariantTest is StdInvariant, Test {
   //////////////////////////////////////////////////////////////*/
 
 	/// @notice INV14: No reentrancy should be possible (tested via state consistency)
-	function invariant_stateConsistencyAfterOperations() public view {
+	function invariant_stateConsistencyAfterOperations() public pure {
 		// If reentrancy occurred, state would be inconsistent
 		// This is tested indirectly through all other invariants
 		assertTrue(true, "INV14: State consistency maintained");
