@@ -21,7 +21,7 @@ abis/
 forge-out/
 forge-cache/
 broadcast/
-lib/
+# lib/ is needed for forge-std submodule
 
 # Deployment records (contains sensitive deployment data)
 deployments.json
