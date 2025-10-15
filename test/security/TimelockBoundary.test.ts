@@ -183,6 +183,92 @@ describe("Timelock Boundary Tests", function () {
     });
   });
 
+  describe("Tax Change Cancellation", function () {
+    it("Should allow owner to cancel pending tax change", async function () {
+      await cap.connect(owner).proposeTaxChange(200, 300, 50);
+
+      expect(await cap.taxChangeTimestamp()).to.not.equal(0);
+      expect(await cap.pendingTransferTaxBp()).to.equal(200);
+
+      // Cancel the pending change
+      const tx = await cap.connect(owner).cancelTaxChange();
+      await expect(tx).to.emit(cap, "TaxChangeCancelled").withArgs(200, 300, 50);
+
+      // Verify state is reset
+      expect(await cap.taxChangeTimestamp()).to.equal(0);
+      expect(await cap.pendingTransferTaxBp()).to.equal(0);
+      expect(await cap.pendingSellTaxBp()).to.equal(0);
+      expect(await cap.pendingBuyTaxBp()).to.equal(0);
+
+      // Original taxes unchanged
+      expect(await cap.transferTaxBp()).to.equal(100);
+      expect(await cap.sellTaxBp()).to.equal(100);
+      expect(await cap.buyTaxBp()).to.equal(0);
+    });
+
+    it("Should revert when cancelling with no pending change", async function () {
+      await expect(cap.connect(owner).cancelTaxChange()).to.be.revertedWith("NO_PENDING_CHANGE");
+    });
+
+    it("Should allow cancel even after timelock expired", async function () {
+      await cap.connect(owner).proposeTaxChange(200, 300, 50);
+
+      // Wait past timelock
+      await time.increase(TIMELOCK_DELAY + 3600);
+
+      // Should still be able to cancel (governance decided not to apply)
+      await cap.connect(owner).cancelTaxChange();
+
+      expect(await cap.taxChangeTimestamp()).to.equal(0);
+    });
+
+    it("Should allow new proposal after cancellation", async function () {
+      // First proposal
+      await cap.connect(owner).proposeTaxChange(200, 300, 50);
+
+      // Cancel it
+      await cap.connect(owner).cancelTaxChange();
+
+      // Should be able to propose new values
+      await cap.connect(owner).proposeTaxChange(150, 250, 25);
+
+      expect(await cap.pendingTransferTaxBp()).to.equal(150);
+      expect(await cap.pendingSellTaxBp()).to.equal(250);
+      expect(await cap.pendingBuyTaxBp()).to.equal(25);
+
+      // And apply the new proposal
+      await time.increase(TIMELOCK_DELAY + 1);
+      await cap.connect(owner).applyTaxChange();
+
+      expect(await cap.transferTaxBp()).to.equal(150);
+    });
+
+    it("Should prevent non-owner from cancelling", async function () {
+      await cap.connect(owner).proposeTaxChange(200, 300, 50);
+
+      await expect(cap.connect(user1).cancelTaxChange()).to.be.revertedWithCustomError(
+        cap,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+
+    it("Should handle cancel-propose-cancel cycle", async function () {
+      // First proposal
+      await cap.connect(owner).proposeTaxChange(200, 300, 50);
+      await cap.connect(owner).cancelTaxChange();
+
+      // Second proposal
+      await cap.connect(owner).proposeTaxChange(150, 250, 25);
+      await cap.connect(owner).cancelTaxChange();
+
+      // Third proposal - should work fine
+      await cap.connect(owner).proposeTaxChange(100, 200, 0);
+
+      expect(await cap.pendingTransferTaxBp()).to.equal(100);
+      expect(await cap.pendingSellTaxBp()).to.equal(200);
+    });
+  });
+
   describe("Timelock Interaction with Other Operations", function () {
     it("Should allow immediate tax changes during pending timelock", async function () {
       // Propose timelock change

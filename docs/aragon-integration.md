@@ -89,14 +89,20 @@ const tokenVotingConfig = {
 
 ### 3. Transfer Token Ownership to DAO
 
-Once the DAO is created, transfer CAP token ownership:
+Once the DAO is created, transfer CAP token ownership. The CAP token uses OpenZeppelin's `Ownable` which has a simple one-step transfer:
 
 ```javascript
-// Create proposal to accept token ownership
+// Option 1: Direct transfer from deployer (outside of governance)
+// Execute this from the deployer account immediately after DAO creation
+const capToken = await ethers.getContractAt("CAPToken", process.env.CAP_TOKEN_ADDRESS);
+await capToken.transferOwnership(DAO_ADDRESS);
+
+// Option 2: Create a governance proposal to transfer ownership
+// (Use this if ownership is currently held by another contract/DAO)
 const transferOwnershipAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData("acceptOwnership", []),
+  data: capTokenInterface.encodeFunctionData("transferOwnership", [DAO_ADDRESS]),
 };
 
 // Create proposal in DAO
@@ -104,10 +110,10 @@ const proposalParams = {
   pluginAddress: tokenVotingPluginAddress,
   actions: [transferOwnershipAction],
   metadata: {
-    title: "Accept CAP Token Ownership",
+    title: "Transfer CAP Token Ownership to DAO",
     summary: "Transfer CAP token administrative control to the DAO",
     description:
-      "This proposal transfers ownership of the CAP token contract from the deployer to this DAO, enabling governance-controlled administration.",
+      "This proposal transfers ownership of the CAP token contract to this DAO, enabling governance-controlled administration of taxes, pools, upgrades, and minting.",
     resources: [],
   },
 };
@@ -115,16 +121,19 @@ const proposalParams = {
 const proposal = await client.methods.createProposal(proposalParams);
 ```
 
+**Important**: After transferring ownership to the DAO, all administrative functions (tax changes, pool management, upgrades, minting) will require governance proposals and voting.
+
 ### 4. Example Governance Proposals
 
 #### Update Tax Rates
 
 ```javascript
-// Proposal to update tax rates
-const updateTaxesAction = {
+// Proposal to update tax rates (uses 24h timelock mechanism)
+// Step 1: Propose the tax change
+const proposeTaxChangeAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData("setTaxes", [
+  data: capTokenInterface.encodeFunctionData("proposeTaxChange", [
     50, // 0.5% transfer tax
     150, // 1.5% sell tax
     0, // 0% buy tax
@@ -133,11 +142,12 @@ const updateTaxesAction = {
 
 const taxProposal = {
   pluginAddress: tokenVotingPluginAddress,
-  actions: [updateTaxesAction],
+  actions: [proposeTaxChangeAction],
   metadata: {
-    title: "Adjust Tax Rates",
+    title: "Propose Tax Rate Adjustment",
     summary: "Reduce transfer tax to 0.5% and increase sell tax to 1.5%",
-    description: "This proposal adjusts the tax structure to encourage holding while maintaining revenue from sells.",
+    description:
+      "This proposal initiates a 24-hour timelock for tax changes. After approval, the changes will become effective 24 hours later when applyTaxChange() is called. This timelock protects token holders from sudden tax changes.",
     resources: [
       {
         name: "Tax Impact Analysis",
@@ -145,6 +155,25 @@ const taxProposal = {
       },
     ],
   },
+};
+
+// Step 2: After 24 hours, apply the tax change (requires separate proposal)
+const applyTaxChangeAction = {
+  to: process.env.CAP_TOKEN_ADDRESS,
+  value: 0,
+  data: capTokenInterface.encodeFunctionData("applyTaxChange", []),
+};
+
+// Note: For emergency situations, use setTaxesImmediate() which bypasses the timelock
+// This should only be used in critical situations with strong DAO consensus
+const emergencyTaxAction = {
+  to: process.env.CAP_TOKEN_ADDRESS,
+  value: 0,
+  data: capTokenInterface.encodeFunctionData("setTaxesImmediate", [
+    50, // 0.5% transfer tax
+    150, // 1.5% sell tax
+    0, // 0% buy tax
+  ]),
 };
 ```
 

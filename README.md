@@ -172,6 +172,9 @@ proposeTaxChange(uint256 transfer, uint256 sell, uint256 buy)
 // Apply pending tax changes after 24h delay
 applyTaxChange()
 
+// Cancel pending tax change before it takes effect
+cancelTaxChange()
+
 // Emergency: Set taxes immediately (use with caution)
 setTaxesImmediate(uint256 transfer, uint256 sell, uint256 buy)
 ```

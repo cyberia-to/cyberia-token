@@ -212,8 +212,8 @@
           "clearance": "Function",
           "functions": [
             {
-              "sighash": "0x2f2f6e76",
-              "name": "setTaxes(uint256,uint256,uint256)",
+              "sighash": "0xa01c486c",
+              "name": "proposeTaxChange(uint256,uint256,uint256)",
               "executionOptions": "None",
               "wildcarded": false,
               "condition": {
@@ -238,6 +238,44 @@
               }
             },
             {
+              "sighash": "0x56f3a6ff",
+              "name": "setTaxesImmediate(uint256,uint256,uint256)",
+              "executionOptions": "None",
+              "wildcarded": false,
+              "condition": {
+                "paramType": "Tuple",
+                "children": [
+                  {
+                    "paramType": "Uint256",
+                    "operator": "LessThan",
+                    "compValue": "501"
+                  },
+                  {
+                    "paramType": "Uint256",
+                    "operator": "LessThan",
+                    "compValue": "501"
+                  },
+                  {
+                    "paramType": "Uint256",
+                    "operator": "LessThan",
+                    "compValue": "501"
+                  }
+                ]
+              }
+            },
+            {
+              "sighash": "0xe7ee6383",
+              "name": "applyTaxChange()",
+              "executionOptions": "None",
+              "wildcarded": false
+            },
+            {
+              "sighash": "0x9dddac76",
+              "name": "cancelTaxChange()",
+              "executionOptions": "None",
+              "wildcarded": false
+            },
+            {
               "sighash": "0x64f65ff0",
               "name": "setFeeRecipient(address)",
               "executionOptions": "None",
@@ -254,6 +292,26 @@
               "name": "removePool(address)",
               "executionOptions": "None",
               "wildcarded": false
+            },
+            {
+              "sighash": "0x40c10f19",
+              "name": "mint(address,uint256)",
+              "executionOptions": "None",
+              "wildcarded": false,
+              "condition": {
+                "paramType": "Tuple",
+                "children": [
+                  {
+                    "paramType": "Address",
+                    "operator": "Pass"
+                  },
+                  {
+                    "paramType": "Uint256",
+                    "operator": "LessThan",
+                    "compValue": "10000000000000000000000000000"
+                  }
+                ]
+              }
             },
             {
               "sighash": "0x4f1ef286",

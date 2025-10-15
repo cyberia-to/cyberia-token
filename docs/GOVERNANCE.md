@@ -336,6 +336,236 @@ const available = maxSupply - currentSupply;
 console.log(`Available to mint: ${ethers.formatEther(available)} CAP`);
 ```
 
+## Emergency Procedures
+
+### When to Use Emergency Functions
+
+The CAP token includes emergency functions that bypass the normal 24-hour timelock. These should ONLY be used in the following situations:
+
+#### Critical Situations Requiring Immediate Action
+
+1. **Security Exploit Detected**
+   - An active attack is draining liquidity
+   - A vulnerability is being exploited in the tax mechanism
+   - Contract behavior is causing unintended token loss
+
+2. **Market Manipulation**
+   - Coordinated attack to exploit tax arbitrage
+   - Flash loan attack abusing pool detection
+   - Extreme tax burden causing cascading failures
+
+3. **Initial Setup/Migration**
+   - Setting initial tax rates during deployment
+   - Migrating from old contract to new implementation
+   - Correcting deployment configuration errors
+
+### Emergency Function: setTaxesImmediate()
+
+```solidity
+// ⚠️ BYPASSES 24-HOUR TIMELOCK - USE WITH EXTREME CAUTION
+capToken.setTaxesImmediate(uint256 _transferTaxBp, uint256 _sellTaxBp, uint256 _buyTaxBp)
+```
+
+**When to use:**
+
+- Immediate response to active exploit
+- Critical market protection
+- Initial deployment setup
+
+**When NOT to use:**
+
+- Routine tax adjustments (use `proposeTaxChange()` instead)
+- Community-requested changes (allow 24h review period)
+- Gradual policy changes
+
+**Example Emergency Response:**
+
+```javascript
+// SCENARIO: Exploit detected where attackers are using pool transfers to avoid taxes
+// IMMEDIATE ACTION: Set all taxes to minimal values temporarily
+
+// Step 1: Emergency DAO call (requires multi-sig or high quorum)
+await daoExecute(
+  capToken.address,
+  "setTaxesImmediate(uint256,uint256,uint256)",
+  [0, 0, 0] // Temporarily disable all taxes to stop exploit
+);
+
+// Step 2: Remove exploited pool
+await daoExecute(capToken.address, "removePool(address)", [EXPLOITED_POOL_ADDRESS]);
+
+// Step 3: Communicate to community immediately
+announceEmergency("Tax system temporarily disabled due to active exploit. Team investigating.");
+
+// Step 4: After exploit is fixed, restore normal taxes using standard timelock
+await daoExecute(
+  capToken.address,
+  "proposeTaxChange(uint256,uint256,uint256)",
+  [100, 100, 0] // Restore normal taxes with 24h notice
+);
+```
+
+### Emergency Function: cancelTaxChange()
+
+```solidity
+// Cancel a pending tax change during the 24-hour timelock period
+capToken.cancelTaxChange()
+```
+
+**When to use:**
+
+- Error discovered in proposed tax rates
+- Community identifies issue during review period
+- Market conditions change significantly
+- Incorrect proposal parameters
+
+**Example Cancellation:**
+
+```javascript
+// SCENARIO: Proposed tax change has error - combined rate would exceed 8% cap
+// (This should be caught by contract validation, but shown for illustration)
+
+// Day 1: Tax change proposed
+await dao.execute(
+  capToken.address,
+  "proposeTaxChange(uint256,uint256,uint256)",
+  [400, 500, 0] // 4% transfer + 5% sell = 9% combined (exceeds cap)
+);
+// Note: This would actually revert with "COMBINED_SELL_TAX_TOO_HIGH"
+
+// Community spots issue during review period
+// Cancel before it takes effect
+await dao.execute(capToken.address, "cancelTaxChange()", []);
+
+// Re-propose with correct values
+await dao.execute(
+  capToken.address,
+  "proposeTaxChange(uint256,uint256,uint256)",
+  [300, 400, 0] // 3% transfer + 4% sell = 7% combined (within cap)
+);
+```
+
+### Emergency Response Checklist
+
+#### Immediate Response (0-1 hour)
+
+- [ ] **Confirm the emergency** - Verify the issue is real and active
+- [ ] **Assess impact** - Determine severity and affected users
+- [ ] **Alert core team** - Notify all multi-sig signers immediately
+- [ ] **Pause if possible** - Consider if emergency action is warranted
+- [ ] **Document everything** - Record timeline, actions, and rationale
+
+#### Short-term Response (1-24 hours)
+
+- [ ] **Execute emergency action** - Use `setTaxesImmediate()` if necessary
+- [ ] **Communicate publicly** - Announce on Discord, Twitter, governance forum
+- [ ] **Investigate root cause** - Determine how the issue occurred
+- [ ] **Prepare fix** - Develop proper solution (may require upgrade)
+- [ ] **Monitor contract** - Watch for further issues or exploitation
+
+#### Long-term Response (24+ hours)
+
+- [ ] **Restore normal operation** - Use standard timelock for any further changes
+- [ ] **Post-mortem analysis** - Document what happened and lessons learned
+- [ ] **Security improvements** - Update processes to prevent recurrence
+- [ ] **Community update** - Full transparency report to DAO
+- [ ] **Consider audit** - If new code deployed, get security review
+
+### Emergency Communication Template
+
+```markdown
+🚨 EMERGENCY ALERT: CAP Token
+
+**Status:** [Active Incident / Resolved / Monitoring]
+**Severity:** [Critical / High / Medium]
+**Time Detected:** [UTC timestamp]
+
+**Issue Description:**
+[Brief explanation of what happened]
+
+**Immediate Actions Taken:**
+
+- [Action 1 with timestamp]
+- [Action 2 with timestamp]
+
+**User Impact:**
+
+- Affected users: [number or "all holders"]
+- Financial impact: [estimated]
+- Current status: [trading paused/modified/normal]
+
+**Next Steps:**
+
+1. [Planned action 1]
+2. [Planned action 2]
+
+**Timeline:**
+
+- [Time] - Issue detected
+- [Time] - Emergency DAO call initiated
+- [Time] - Emergency function executed
+- [Time] - [Current status]
+
+**Resources:**
+
+- Transaction: [Etherscan link]
+- Discussion: [Governance forum link]
+- Updates: [Discord channel]
+
+We will provide updates every [X] hours until resolved.
+```
+
+### Governance Escalation Paths
+
+Different severity levels require different approval processes:
+
+#### Level 1: Routine (Standard Timelock)
+
+- **Use:** Normal tax adjustments, pool additions, fee recipient updates
+- **Process:** `proposeTaxChange()` → 24h wait → `applyTaxChange()`
+- **Approval:** Standard DAO proposal (50% support, 15% participation)
+- **Timeline:** Minimum 48 hours (24h proposal + 24h timelock)
+
+#### Level 2: Urgent (Fast-Track)
+
+- **Use:** Time-sensitive but non-critical changes
+- **Process:** Expedited DAO proposal with higher quorum
+- **Approval:** 60% support, 25% participation, shorter voting period
+- **Timeline:** 12-24 hours
+
+#### Level 3: Emergency (Immediate)
+
+- **Use:** Active exploits, critical security issues
+- **Process:** Multi-sig emergency action or ultra-high quorum snapshot
+- **Approval:** 3/5 multi-sig OR 75% support with 40% participation
+- **Timeline:** 0-2 hours
+- **Follow-up:** Ratification vote within 7 days
+
+### Post-Emergency Audit Requirements
+
+After using any emergency function:
+
+1. **Transparency Report** (within 48 hours)
+   - Detailed timeline of events
+   - Rationale for emergency action
+   - List of all affected transactions
+   - Financial impact assessment
+
+2. **Community Ratification** (within 7 days)
+   - Formal DAO vote to ratify emergency actions
+   - Discussion period for concerns
+   - Plan to prevent similar issues
+
+3. **Security Review** (if code changed)
+   - External audit of any new implementation
+   - Peer review by other developers
+   - Testnet deployment and testing
+
+4. **Process Improvement** (within 30 days)
+   - Update emergency procedures based on lessons learned
+   - Enhance monitoring and alerts
+   - Improve response time capabilities
+
 ## Best Practices
 
 1. **Tax Changes:**
@@ -343,27 +573,39 @@ console.log(`Available to mint: ${ethers.formatEther(available)} CAP`);
    - Only use `setTaxesImmediate()` in true emergencies
    - Announce proposals publicly before submitting
    - Allow community discussion during 24h period
+   - Use `cancelTaxChange()` if errors discovered during review
 
 2. **Pool Management:**
    - Add all official AMM pools immediately after creation
    - Remove deprecated pools to prevent confusion
    - Verify pool addresses before adding
+   - Monitor pool behavior for anomalies
 
 3. **Fee Management:**
    - Treasury address should be a Gnosis Safe multisig
    - Only enable burn mode after community consensus
    - Monitor treasury balance regularly
+   - Ensure multi-sig signers are available 24/7 for emergencies
 
 4. **Minting:**
    - Only mint for approved use cases (e.g., bridging)
    - Document reason for each mint in proposal
    - Never exceed MAX_SUPPLY
+   - Verify recipient address before minting
 
 5. **Upgrades:**
    - Test thoroughly on testnet first
    - Get security audit for implementation changes
    - Use timelock on DAO level for upgrade proposals
    - Verify storage layout compatibility
+   - Have rollback plan prepared
+
+6. **Emergency Preparedness:**
+   - Maintain 24/7 monitoring of contract events
+   - Keep multi-sig signers on alert
+   - Pre-approve emergency action templates
+   - Run quarterly emergency response drills
+   - Document all decision-makers' contact info
 
 ## Resources
 

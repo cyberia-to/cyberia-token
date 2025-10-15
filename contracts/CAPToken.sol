@@ -46,6 +46,7 @@ contract CAPToken is
 	event PoolAdded(address indexed pool);
 	event PoolRemoved(address indexed pool);
 	event TaxChangeProposed(uint256 transferTaxBp, uint256 sellTaxBp, uint256 buyTaxBp, uint256 effectiveTime);
+	event TaxChangeCancelled(uint256 cancelledTransferTaxBp, uint256 cancelledSellTaxBp, uint256 cancelledBuyTaxBp);
 	event TaxesUpdated(uint256 transferTaxBp, uint256 sellTaxBp, uint256 buyTaxBp);
 	event FeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
 	event TaxBurned(address indexed from, address indexed to, uint256 grossAmount, uint256 taxAmount);
@@ -110,6 +111,25 @@ contract CAPToken is
 		taxChangeTimestamp = 0;
 
 		emit TaxesUpdated(transferTaxBp, sellTaxBp, buyTaxBp);
+	}
+
+	/// @notice Cancel a pending tax change before it takes effect
+	/// @dev Allows governance to abort a proposed tax change during the timelock period
+	function cancelTaxChange() external onlyOwner {
+		require(taxChangeTimestamp != 0, "NO_PENDING_CHANGE");
+
+		// Store the cancelled values for the event
+		uint256 cancelledTransfer = pendingTransferTaxBp;
+		uint256 cancelledSell = pendingSellTaxBp;
+		uint256 cancelledBuy = pendingBuyTaxBp;
+
+		// Reset pending state
+		pendingTransferTaxBp = 0;
+		pendingSellTaxBp = 0;
+		pendingBuyTaxBp = 0;
+		taxChangeTimestamp = 0;
+
+		emit TaxChangeCancelled(cancelledTransfer, cancelledSell, cancelledBuy);
 	}
 
 	/// @notice Set taxes immediately (for initialization or emergency - use with caution)
