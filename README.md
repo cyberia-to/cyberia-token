@@ -246,8 +246,9 @@ Board Members
 ### Sepolia Testnet
 
 - **Proxy**: [`0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e`](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e)
-- **Implementation**: [`0x5A21A7526e1180B33A366E338ab4020A357D464d`](https://sepolia.etherscan.io/address/0x5A21A7526e1180B33A366E338ab4020A357D464d)
-- **Status**: Verified ✅ - Deployed 10/15/2025
+- **Implementation (v1.1.0)**: [`0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad`](https://sepolia.etherscan.io/address/0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad)
+- **Status**: Verified ✅ - Upgraded 10/15/2025
+- **Changes**: Added `cancelTaxChange()` function, fixed Zodiac config
 
 ### Mainnet
 
