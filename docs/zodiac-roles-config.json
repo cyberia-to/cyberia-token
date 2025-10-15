@@ -168,7 +168,7 @@
       "name": "DAO Large Operations",
       "description": "High-value transfers requiring DAO governance approval",
       "members": [
-        "{{ARAGON_DAO_ADDRESS}}"
+        "0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33"
       ],
       "targets": [
         {
@@ -204,7 +204,7 @@
       "name": "DAO Token Administration",
       "description": "CAP token administrative functions restricted to DAO",
       "members": [
-        "{{ARAGON_DAO_ADDRESS}}"
+        "0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33"
       ],
       "targets": [
         {
@@ -276,19 +276,19 @@
               "wildcarded": false
             },
             {
-              "sighash": "0x64f65ff0",
+              "sighash": "0xe74b981b",
               "name": "setFeeRecipient(address)",
               "executionOptions": "None",
               "wildcarded": false
             },
             {
-              "sighash": "0xe43252d7",
+              "sighash": "0xd914cd4b",
               "name": "addPool(address)",
               "executionOptions": "None",
               "wildcarded": false
             },
             {
-              "sighash": "0x041d3357",
+              "sighash": "0x3b7d0946",
               "name": "removePool(address)",
               "executionOptions": "None",
               "wildcarded": false

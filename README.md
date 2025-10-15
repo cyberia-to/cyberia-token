@@ -1,6 +1,6 @@
 # Cyberia (CAP) Token
 
-[![Tests](https://img.shields.io/badge/Tests-231%2F231%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA419fD4e3BA375250d5D946D91262769F905aEED) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
+[![Tests](https://img.shields.io/badge/Tests-256%2F256%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
 
 Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx DAO.
 
@@ -116,7 +116,7 @@ NEW_FEE_RECIPIENT=0x... npm run configure:sepolia
 ### Hardhat Tests
 
 ```bash
-npm test                    # All 126 comprehensive tests
+npm test                    # All 151 comprehensive tests
 npm run test:unit           # Unit tests
 npm run test:security       # Security tests
 npm run test:integration    # Integration tests
@@ -143,11 +143,11 @@ npm run validate:zodiac     # Validate Zodiac roles config
 
 ### Test Suite Breakdown
 
-#### Hardhat Tests (126 tests)
+#### Hardhat Tests (151 tests)
 
-- **Unit Tests** (42 tests): Core functionality (deployment, tax system, minting, burning, access control)
-- **Security Tests** (32 tests): Reentrancy, attack vectors, upgrade safety, permit signatures
-- **Integration Tests** (52 tests): DAO integration, mainnet fork, invariants, checkpoints, delegation
+- **Unit Tests** (62 tests): Core functionality, deployment, tax system, minting, burning, access control, checkpoints, edge cases
+- **Security Tests** (57 tests): Reentrancy protection, attack vectors, upgrade safety, permit signatures, timelock boundaries
+- **Integration Tests** (75 tests): DAO integration, Zodiac Safe integration, mainnet fork, invariants, delegation
 
 #### Foundry Tests (105 tests)
 
@@ -157,7 +157,7 @@ npm run validate:zodiac     # Validate Zodiac roles config
 - **Stateful Tests** (14 tests): Multi-step complex scenarios with state transitions
 - **Invariant Tests** (15 tests): Mathematical invariants under all conditions (128K calls per run)
 
-**Total Coverage**: 231 tests ensuring comprehensive coverage of all contract functionality and security properties
+**Total Coverage**: 256 tests ensuring comprehensive coverage of all contract functionality and security properties
 
 ## Contract Administration
 
@@ -247,8 +247,10 @@ Board Members
 
 - **Proxy**: [`0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e`](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e)
 - **Implementation (v1.1.0)**: [`0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad`](https://sepolia.etherscan.io/address/0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad)
-- **Status**: Verified ✅ - Upgraded 10/15/2025
-- **Changes**: Added `cancelTaxChange()` function, fixed Zodiac config
+- **Aragon DAO**: [`0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33`](https://app.aragon.org/#/daos/sepolia/0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33)
+- **Governance Plugin**: [`0x295878F28f403EE6e6C6b4474e8E123022063b24`](https://sepolia.etherscan.io/address/0x295878F28f403EE6e6C6b4474e8E123022063b24)
+- **Status**: Verified ✅ - Upgraded 10/15/2025 | DAO Governance Active ✅
+- **Changes**: Added `cancelTaxChange()` function, fixed Zodiac config, transferred ownership to DAO
 
 ### Mainnet
 
@@ -291,7 +293,7 @@ Board Members
 
 **Testing**:
 
-- ✅ Expanded test suite from 45 to 231 tests (414% increase)
+- ✅ Expanded test suite from 45 to 256 tests (469% increase)
 - ✅ Added comprehensive fuzz testing (16 tests, 256 runs each)
 - ✅ Added stateful testing (14 complex scenarios)
 - ✅ Added invariant testing (15 properties, 128K calls each)
