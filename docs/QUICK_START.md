@@ -111,8 +111,10 @@ npm run verify:mainnet  # Verify on mainnet (auto-detects from deployments.json)
 ### Required for Localhost
 
 ```env
-LOCALHOST_OWNER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-LOCALHOST_FEE_RECIPIENT=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+# No configuration needed!
+# Localhost automatically uses Hardhat's default test accounts:
+#   Owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+#   Fee Recipient: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 ```
 
 ### Required for Sepolia
