@@ -10,3 +10,6 @@ dist
 !package.json
 !tsconfig.json
 !.prettierrc.json
+
+# Submodules (don't format third-party code)
+lib/
