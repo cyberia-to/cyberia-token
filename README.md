@@ -6,49 +6,56 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 
 ## Features
 
-- ERC-20 with EIP-2612 Permit & ERC-20 Votes
-- UUPS Upgradeable (OpenZeppelin)
-- Configurable tax system (transfer/buy/sell, max 5% each, 8% combined)
-- AMM pool detection
-- Burn mechanism
-- Owner-gated minting for future OFT bridging
+- **ERC-20 Standard**: Full EIP-20 compliance with EIP-2612 Permit & ERC-20 Votes
+- **UUPS Upgradeable**: OpenZeppelin upgradeable pattern with DAO-controlled upgrades
+- **Configurable Tax System**: Transfer/buy/sell taxes (max 5% each, 8% combined) with 24h timelock
+- **AMM Integration**: Pool detection for Uniswap and other DEXs
+- **Burn Mechanism**: Token burning and optional burn mode for taxes
+- **Bridging Ready**: Owner-gated minting (max 10B supply) for future OFT/LayerZero bridging
+- **DAO Governance**: Aragon OSx integration with token-voting plugin
+
+## Deployed Contracts
+
+### Sepolia Testnet
+
+| Component             | Address                                      | Link                                                                                           |
+| --------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Token Proxy**       | `0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e` | [Etherscan](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e)   |
+| **Implementation**    | `0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad` | [Etherscan](https://sepolia.etherscan.io/address/0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad)   |
+| **Aragon DAO**        | `0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33` | [Aragon App](https://app.aragon.org/#/daos/sepolia/0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33) |
+| **Governance Plugin** | `0x295878F28f403EE6e6C6b4474e8E123022063b24` | [Etherscan](https://sepolia.etherscan.io/address/0x295878F28f403EE6e6C6b4474e8E123022063b24)   |
+| **Uniswap V4 Pool**   | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` | [Etherscan](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543)   |
+
+**Pool Details**: CAP/WETH pair | 0.3% fee | Initial price: 100,000 CAP = 1 ETH
+**Pool Creation**: [TX](https://sepolia.etherscan.io/tx/0x35bc25cd4426bf4959ec96adc6fa95cfcea528527e00f183fdcf7c6467170888) | **DAO Proposal**: [TX](https://sepolia.etherscan.io/tx/0x065fb9c34cf70e5a896f0e1a2036819230286696870a32858822c8e9061cdb4c)
+
+**Version**: v1.1.0 | **Status**: ✅ Verified | ✅ DAO Governance Active | ⚠️ Not audited
+
+### Mainnet
+
+Not deployed yet. Production deployment requires security audit.
 
 ## Quick Start
 
 ```bash
-# Clone the repository with submodules
+# Clone repository
 git clone --recurse-submodules https://github.com/cyberia-to/cyberia-token.git
 cd cyberia-token
-
-# OR if you already cloned without --recurse-submodules
-git submodule update --init --recursive
 
 # Install dependencies
 npm install
 
-# Install Foundry (optional, for fuzz/invariant tests)
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
+# Run tests
+npm test                     # Run all tests (256 passing)
+npm run test:coverage        # Generate coverage report
 
-# Code Quality
-npm run format               # Format code
-npm run lint                 # Lint TypeScript
-npm run lint:sol             # Lint Solidity
-
-# Test
-npm test                     # Run all Hardhat tests
-npm run test:foundry         # Run Foundry tests (requires Foundry)
-npm run test:coverage        # Generate coverage
-
-# Deploy localhost
-npm run node                 # Terminal 1
-npm run deploy:localhost     # Terminal 2
-
-# Deploy testnet/mainnet
-cp .env.example .env         # Configure first
-npm run deploy:sepolia
-npm run deploy:mainnet
+# Deploy to testnet
+cp .env.example .env         # Configure environment variables
+npm run deploy:sepolia       # Deploy to Sepolia
+npm run verify:sepolia       # Verify on Etherscan
 ```
+
+See [Development Guide](docs/DEVELOPMENT.md) for detailed setup instructions.
 
 ## Token Info
 
@@ -77,39 +84,33 @@ npm run deploy:mainnet
 
 ## Deployment
 
-### Environments
-
-| Network   | Command                    |
-| --------- | -------------------------- |
-| Localhost | `npm run deploy:localhost` |
-| Sepolia   | `npm run deploy:sepolia`   |
-| Mainnet   | `npm run deploy:mainnet`   |
-
-### Setup
+### Environment Configuration
 
 ```bash
-# Configure .env
+# .env file
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 PRIVATE_KEY=0x...
 ETHERSCAN_API_KEY=...
 SEPOLIA_OWNER_ADDRESS=0x...      # DAO address
 SEPOLIA_FEE_RECIPIENT=0x...      # Treasury address
 ```
 
-### Deploy & Verify
+### Deploy Commands
+
+| Network | Command                  |
+| ------- | ------------------------ |
+| Sepolia | `npm run deploy:sepolia` |
+| Mainnet | `npm run deploy:mainnet` |
+
+### Post-Deployment
 
 ```bash
-npm run deploy:sepolia
-npm run verify:sepolia  # Automatically detects proxy address from deployments.json
+npm run verify:sepolia           # Verify contract on Etherscan
+npm run configure:sepolia        # Configure pools and settings
 ```
 
-### Configure
-
-```bash
-# Addresses auto-detected from deployments.json
-POOL_ADDRESS=0x... npm run configure:sepolia
-NEW_FEE_RECIPIENT=0x... npm run configure:sepolia
-```
+See [Deployment Guide](docs/DEPLOYMENT.md) for complete deployment procedures.
 
 ## Testing
 
@@ -241,32 +242,17 @@ Zodiac Roles Module
 Board Members
 ```
 
-## Deployed Contracts
-
-### Sepolia Testnet
-
-- **Proxy**: [`0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e`](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e)
-- **Implementation (v1.1.0)**: [`0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad`](https://sepolia.etherscan.io/address/0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad)
-- **Aragon DAO**: [`0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33`](https://app.aragon.org/#/daos/sepolia/0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33)
-- **Governance Plugin**: [`0x295878F28f403EE6e6C6b4474e8E123022063b24`](https://sepolia.etherscan.io/address/0x295878F28f403EE6e6C6b4474e8E123022063b24)
-- **Status**: Verified ✅ - Upgraded 10/15/2025 | DAO Governance Active ✅
-- **Changes**: Added `cancelTaxChange()` function, fixed Zodiac config, transferred ownership to DAO
-
-### Mainnet
-
-- Not deployed yet
-
 ## Documentation
 
 - [Development Guide](docs/DEVELOPMENT.md) - Setup, workflow, testing, CI/CD
-- [Governance Guide](docs/GOVERNANCE.md) - Tax management, timelock workflow
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment procedures
-- [Deployment Workflows](docs/DEPLOYMENT_WORKFLOWS.md) - GitHub Actions deployment automation
-- [Quick Start](docs/QUICK_START.md) - Get started quickly
-- [Foundry Testing](docs/FOUNDRY.md) - Property-based and invariant testing
+- [Governance Guide](docs/GOVERNANCE.md) - Tax management, timelock workflow
+- [Uniswap Pool Setup](docs/UNISWAP_POOL_SETUP.md) - Create and register liquidity pools
 - [Aragon Integration](docs/aragon-integration.md) - DAO governance integration
 - [Safe Setup Guide](docs/safe-setup-guide.md) - Gnosis Safe + Zodiac configuration
-- [Contract Source](contracts/CAPToken.sol) - Main contract code
+- [Foundry Testing](docs/FOUNDRY.md) - Property-based and invariant testing
+- [Quick Start](docs/QUICK_START.md) - Get started quickly
+- [Contract API](docs/api/index.md) - Auto-generated API documentation
 
 ## Security
 
@@ -281,30 +267,6 @@ Board Members
 ### Security Status
 
 ⚠️ **Not audited**. Professional security audit required before mainnet deployment.
-
-### Recent Improvements
-
-**Security**:
-
-- ✅ Added `ReentrancyGuard` to prevent reentrancy attacks
-- ✅ Implemented 24-hour timelock mechanism for tax changes
-- ✅ Added maximum supply protection (10B cap)
-- ✅ Fixed pool-to-pool transfer logic for DEX compatibility
-
-**Testing**:
-
-- ✅ Expanded test suite from 45 to 256 tests (469% increase)
-- ✅ Added comprehensive fuzz testing (16 tests, 256 runs each)
-- ✅ Added stateful testing (14 complex scenarios)
-- ✅ Added invariant testing (15 properties, 128K calls each)
-- ✅ Re-enabled and fixed all previously disabled tests
-
-**Code Quality**:
-
-- ✅ Fixed all ESLint warnings (proper TypeScript types)
-- ✅ Fixed Slither CI/CD integration issues
-- ✅ Optimized gas reporting workflow
-- ✅ Enhanced NatSpec documentation
 
 ## License
 

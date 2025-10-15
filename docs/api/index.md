@@ -110,6 +110,12 @@ event PoolRemoved(address pool)
 event TaxChangeProposed(uint256 transferTaxBp, uint256 sellTaxBp, uint256 buyTaxBp, uint256 effectiveTime)
 ```
 
+### TaxChangeCancelled
+
+```solidity
+event TaxChangeCancelled(uint256 cancelledTransferTaxBp, uint256 cancelledSellTaxBp, uint256 cancelledBuyTaxBp)
+```
+
 ### TaxesUpdated
 
 ```solidity
@@ -152,6 +158,15 @@ constructor() public
 function initialize(address _owner, address _feeRecipient) public
 ```
 
+Initialize the token contract
+
+#### Parameters
+
+| Name           | Type    | Description                                                                                               |
+| -------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| \_owner        | address | The initial owner address (typically the DAO governance contract)                                         |
+| \_feeRecipient | address | The fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected |
+
 ### proposeTaxChange
 
 ```solidity
@@ -168,6 +183,16 @@ function applyTaxChange() external
 
 Apply pending tax changes after timelock delay
 
+### cancelTaxChange
+
+```solidity
+function cancelTaxChange() external
+```
+
+Cancel a pending tax change before it takes effect
+
+_Allows governance to abort a proposed tax change during the timelock period_
+
 ### setTaxesImmediate
 
 ```solidity
@@ -183,6 +208,14 @@ _This bypasses the timelock and should only be used during initial setup_
 ```solidity
 function setFeeRecipient(address _feeRecipient) external
 ```
+
+Update the fee recipient address
+
+#### Parameters
+
+| Name           | Type    | Description                                                                                                   |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| \_feeRecipient | address | The new fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected |
 
 ### addPool
 
