@@ -66,7 +66,10 @@
     "update-readme": "ts-node scripts/update-readme-deployment.ts",
     "deploy": "npm run deploy:sepolia",
     "prepare": "husky",
-    "console:sepolia": "hardhat console --network sepolia"
+    "console:sepolia": "hardhat console --network sepolia",
+    "dao:transfer-governance": "hardhat run --network sepolia scripts/dao/transfer-governance.ts",
+    "dao:delegate": "hardhat run --network sepolia scripts/dao/delegate-tokens.ts",
+    "dao:info": "hardhat run --network sepolia scripts/dao/osx/get-dao-info.ts"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -77,6 +80,7 @@
     "npm": "10.8.2"
   },
   "devDependencies": {
+    "@aragon/osx": "^1.4.0",
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.1.0",

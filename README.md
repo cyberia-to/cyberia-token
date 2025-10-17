@@ -199,41 +199,63 @@ upgradeToAndCall(address newImpl, bytes data)      // UUPS upgrade
 
 ## DAO Integration
 
-### Aragon OSx
+### Aragon OSx - Setup via UI
+
+**Create DAO**: https://app.aragon.org
+
+1. Create new DAO via Aragon App
+2. Install Token Voting plugin
+3. Import your deployed CAP token address
+4. Configure voting parameters (example below)
+5. Deploy DAO
+6. Save DAO address and plugin address to `.env`
+
+**Example Token Voting Configuration**:
 
 ```javascript
-// Token-Voting Plugin Config
 {
-  token: "<CAP_ADDRESS>",
+  token: "0xYourCAPTokenAddress",
   supportThreshold: "500000",      // 50%
   minParticipation: "150000",      // 15%
-  minDuration: 86400,              // 24h
-  minProposerVotingPower: "10000000000000000000000"  // 10k CAP
+  minDuration: 86400,              // 24h (1 day)
+  minProposerVotingPower: "10000000000000000000000"  // 10,000 CAP
 }
 ```
 
-Transfer governance to DAO:
+**After DAO Creation**:
 
-```solidity
-capToken.setGovernance(DAO_ADDRESS);
+```bash
+# 1. Transfer token governance to DAO
+npm run dao:transfer-governance
+
+# 2. Delegate your tokens for voting power
+npm run dao:delegate
+
+# 3. Query DAO status
+npm run dao:info
+
+# 4. Create and manage proposals via Aragon UI
+# Visit: https://app.aragon.org/dao/ethereum-sepolia/[YOUR_DAO_ADDRESS]
 ```
 
-### Gnosis Safe + Zodiac
+**Managing Proposals**: Use the Aragon App UI at https://app.aragon.org to create, vote on, and execute proposals. The UI provides a user-friendly interface for all governance operations.
 
-1. Deploy Safe with board members
-2. Install Zodiac Roles Module
-3. Configure roles for treasury management (using [docs/zodiac-roles-config.json](docs/zodiac-roles-config.json))
-4. Validate configuration: `npm run validate:zodiac`
-5. Set Safe as fee recipient
+### Gnosis Safe + Zodiac - Setup via UI (Required)
 
-**Zodiac Roles Configuration**: The repository includes a production-ready Zodiac Roles policy in [docs/zodiac-roles-config.json](docs/zodiac-roles-config.json) that enforces "Board + DAO" governance rules:
+**Deploy Safe**: https://app.safe.global
 
-- **BOARD_DAILY_OPS**: Small transfers (<50k CAP) by board members
-- **BOARD_MEDIUM_OPS**: Medium transfers (50k-200k CAP) with higher threshold
-- **DAO_LARGE_OPS**: Large transfers (>200k CAP) require DAO governance approval
-- **DAO_TOKEN_ADMIN**: All token admin functions (taxes, pools, upgrades) restricted to DAO
+1. Create Safe with board members (3-5 owners, 2-of-3 threshold)
+2. Install Zodiac Roles Module via Safe Apps
+3. Import role configuration from [docs/zodiac-roles-config.json](docs/zodiac-roles-config.json)
+4. Create DAO proposal to set Safe as fee recipient
+5. Test treasury operations
 
-See [Aragon Integration Guide](docs/aragon-integration.md) and [Safe Setup Guide](docs/safe-setup-guide.md) for detailed instructions.
+**Zodiac Roles Configuration** ([docs/zodiac-roles-config.json](docs/zodiac-roles-config.json)):
+
+- **BOARD_DAILY_OPS**: Small transfers (<50k CAP) by board
+- **BOARD_MEDIUM_OPS**: Medium transfers (50k-200k CAP) with 2-of-3
+- **DAO_LARGE_OPS**: Large transfers (>200k CAP) require DAO vote
+- **DAO_TOKEN_ADMIN**: All admin functions (taxes, pools, upgrades) DAO-only
 
 ## Architecture
 
@@ -249,9 +271,8 @@ Board Members
 
 ## Documentation
 
-- [Aragon Integration Guide](docs/aragon-integration.md) - DAO governance integration and token-voting setup
-- [Safe Setup Guide](docs/safe-setup-guide.md) - Gnosis Safe + Zodiac Roles configuration
-- [Zodiac Roles Config](docs/zodiac-roles-config.json) - Production-ready policy enforcing "Board + DAO" governance
+- [DAO Scripts Guide](docs/dao-scripts-guide.md) - Complete reference for all DAO operations with examples and troubleshooting
+- [Zodiac Roles Config](docs/zodiac-roles-config.json) - Production-ready policy enforcing "Board + DAO" governance (import via Safe UI)
 
 ## Security
 

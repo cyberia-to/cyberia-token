@@ -1,5 +1,31 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run lint-staged for quick pre-commit checks
-npx lint-staged
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+# Run lint-staged for linting and formatting
+echo "📝 Linting and formatting..."
+npx lint-staged || {
+  echo "❌ Linting failed! Fix errors before committing."
+  exit 1
+}
+
+# Run Hardhat tests
+echo ""
+echo "🧪 Running Hardhat tests..."
+npm test || {
+  echo "❌ Hardhat tests failed! Fix tests before committing."
+  exit 1
+}
+
+# Run Foundry tests
+echo ""
+echo "⚡ Running Foundry tests..."
+npm run test:foundry || {
+  echo "❌ Foundry tests failed! Fix tests before committing."
+  exit 1
+}
+
+echo ""
+echo "✅ All pre-commit checks passed!"
