@@ -33,6 +33,10 @@ contract CAPToken is
 
 	// Tax parameters (in basis points)
 	// transferTaxBp: applied to non-pool <-> non-pool transfers and to sells in addition to sellTaxBp (hybrid rule)
+	// NOTE: Tax calculation uses integer division which causes precision loss for small amounts.
+	// For 18-decimal tokens: amounts < 10^(18 - floor(log10(taxBp))) may round down to zero tax.
+	// Example with 1% (100bp): transfers < 10^16 wei (0.01 tokens) will have zero tax due to rounding.
+	// This is acceptable behavior for standard ERC20 tokens and protects against dust attacks.
 	uint256 public transferTaxBp;
 	uint256 public sellTaxBp; // additional tax when user -> pool
 	uint256 public buyTaxBp; // applied when pool -> user (set to 0 by default)

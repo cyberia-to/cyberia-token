@@ -63,6 +63,20 @@ async function upgradeContract(proxyAddress: string, networkName: string) {
   // Get the new contract factory
   const contractFactoryV2 = await hardhatEthers.getContractFactory("CAPToken");
 
+  console.log("\n🔍 Validating storage layout compatibility...");
+  try {
+    await hardhatUpgrades.validateUpgrade(proxyAddress, contractFactoryV2, {
+      kind: "uups",
+    });
+    console.log("✅ Storage layout validation passed");
+  } catch (error) {
+    console.error("❌ Storage layout validation failed:", error);
+    throw new Error(
+      "Storage layout is incompatible with the existing deployment. " +
+        "This could cause data corruption. Aborting upgrade."
+    );
+  }
+
   console.log("\n⏳ Upgrading proxy contract...");
   console.log("   This will deploy a new implementation and update the proxy...");
 
