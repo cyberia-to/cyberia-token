@@ -1,6 +1,6 @@
 # Cyberia (CAP) Token
 
-[![Tests](https://img.shields.io/badge/Tests-256%2F256%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
+[![Tests](https://img.shields.io/badge/Tests-250%2F250%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
 
 Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx DAO.
 
@@ -18,27 +18,35 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 
 ### Sepolia Testnet
 
-| Component          | Address                                      | Link                                                                                         |
-| ------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **Token Proxy**    | `0xA6B680A88c16056de7194CF775D04A45D0692C11` | [Etherscan](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) |
-| **Implementation** | `0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623` | [Etherscan](https://sepolia.etherscan.io/address/0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623) |
-| **Governance**     | `0x9B9bD768891F014fF72864862EF14f139084992D` | Deployer (temporary - transfer to DAO when ready)                                            |
-| **Fee Recipient**  | `0x37Bb361F12D10F31a963033e1D0B3bb3026D6654` | Treasury wallet                                                                              |
-| **Aragon DAO**     | Not deployed yet                             | Pending setup                                                                                |
-| **Gnosis Safe**    | Not deployed yet                             | Pending setup                                                                                |
-| **AMM Pool**       | Not deployed yet                             | Pending setup                                                                                |
+| Component               | Address                                      | Link                                                                                                                                |
+| ----------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Token Proxy**         | `0xA6B680A88c16056de7194CF775D04A45D0692C11` | [Etherscan](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11)                                        |
+| **Implementation**      | `0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623` | [Etherscan](https://sepolia.etherscan.io/address/0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623)                                        |
+| **Governance**          | `0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0` | [Aragon DAO](https://app.aragon.org/dao/ethereum-sepolia/0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0) - Token governance transferred |
+| **Fee Recipient**       | `0x37Bb361F12D10F31a963033e1D0B3bb3026D6654` | Treasury wallet                                                                                                                     |
+| **Aragon DAO**          | `0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0` | [Aragon App](https://app.aragon.org/dao/ethereum-sepolia/0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0) - ✅ Active                    |
+| **Token Voting Plugin** | `0xf1a054C12659D65892a2b0c4c5136A93b8a5F115` | [Etherscan](https://sepolia.etherscan.io/address/0xf1a054C12659D65892a2b0c4c5136A93b8a5F115) - Token voting enabled                 |
+| **Gnosis Safe**         | Not deployed yet                             | Pending setup (required for treasury operations)                                                                                    |
+| **AMM Pool**            | Not deployed yet                             | Pending setup                                                                                                                       |
 
 **Deployment**: October 17, 2025 | **TX**: [0x2ef3e...509ab](https://sepolia.etherscan.io/tx/0x2ef3ed1760d42d0fd73bcad5498ea43deb5db0b280fe08edc7c81778975509ab) | **Block**: 7393742
 
-**Version**: v1.0.0 | **Status**: ✅ Verified | ⏳ DAO Setup Pending | ⚠️ Not audited
+**Version**: v1.0.0 | **Status**: ✅ Verified | ✅ DAO Active | ⚠️ Not audited
 
-**Next Steps:**
+**Completed Steps:**
 
-1. Setup Aragon DAO with token-voting plugin
-2. Deploy Gnosis Safe for treasury management
-3. Configure Zodiac Roles module
-4. Transfer governance to DAO
-5. Create AMM liquidity pool
+1. ✅ Deployed CAP token with UUPS upgradeable pattern
+2. ✅ Created Aragon DAO with token-voting plugin
+3. ✅ Transferred governance to DAO (all admin functions require DAO proposals)
+4. ✅ Delegated tokens (1B CAP voting power active)
+
+**Remaining Steps:**
+
+1. Deploy Gnosis Safe for treasury management
+2. Configure Zodiac Roles module for board permissions
+3. Create AMM liquidity pool (Uniswap V3 or V4)
+4. Transfer fee recipient to Safe (via DAO proposal)
+5. Conduct security audit before mainnet deployment
 
 ### Mainnet
 
@@ -55,7 +63,7 @@ cd cyberia-token
 npm install
 
 # Run tests
-npm test                     # Run all tests (256 passing)
+npm test                     # Run all tests (250 passing: 144 Hardhat + 106 Foundry)
 npm run test:coverage        # Generate coverage report
 
 # Deploy to testnet
@@ -122,7 +130,7 @@ npm run configure:sepolia        # Configure pools and settings
 ### Hardhat Tests
 
 ```bash
-npm test                    # All 151 comprehensive tests
+npm test                    # All 144 comprehensive tests (6 pending)
 npm run test:unit           # Unit tests
 npm run test:security       # Security tests
 npm run test:integration    # Integration tests
@@ -149,21 +157,22 @@ npm run validate:zodiac     # Validate Zodiac roles config
 
 ### Test Suite Breakdown
 
-#### Hardhat Tests (151 tests)
+#### Hardhat Tests (144 tests passing, 6 pending)
 
-- **Unit Tests** (62 tests): Core functionality, deployment, tax system, minting, burning, access control, checkpoints, edge cases
-- **Security Tests** (57 tests): Reentrancy protection, attack vectors, upgrade safety, permit signatures, timelock boundaries
-- **Integration Tests** (75 tests): DAO integration, Zodiac Safe integration, mainnet fork, invariants, delegation
+- **Unit Tests** (60 tests): Core functionality, deployment, tax system, minting, burning, access control, checkpoints, edge cases
+- **Security Tests** (52 tests): Reentrancy protection, attack vectors, upgrade safety, permit signatures, timelock boundaries
+- **Integration Tests** (32 tests): DAO integration, Zodiac Safe integration, mainnet fork, invariants, delegation
+- **Pending Tests** (6 tests): Zodiac Safe integration scenarios requiring Safe deployment
 
-#### Foundry Tests (105 tests)
+#### Foundry Tests (106 tests)
 
 - **Unit Tests** (41 tests): Timelock, permit, events, edge cases, admin functions
 - **Advanced Tests** (19 tests): UUPS upgrades, reentrancy protection, DEX integration, stress testing
 - **Fuzz Tests** (16 tests): Random input testing for edge cases and property validation
-- **Stateful Tests** (14 tests): Multi-step complex scenarios with state transitions
+- **Stateful Tests** (15 tests): Multi-step complex scenarios with state transitions
 - **Invariant Tests** (15 tests): Mathematical invariants under all conditions (128K calls per run)
 
-**Total Coverage**: 256 tests ensuring comprehensive coverage of all contract functionality and security properties
+**Total Coverage**: 250 tests (144 Hardhat + 106 Foundry) ensuring comprehensive coverage of all contract functionality and security properties
 
 ## Contract Administration
 
@@ -193,7 +202,9 @@ setTaxesImmediate(uint256 transfer, uint256 sell, uint256 buy)
 addPool(address pool)                              // Add AMM pool address
 removePool(address pool)                           // Remove AMM pool
 setFeeRecipient(address recipient)                 // 0x0 = burn mode
-mint(address to, uint256 amount)                   // Max supply: 10B tokens
+proposeMint(address to, uint256 amount)            // Propose minting (max supply: 10B)
+executeMint()                                      // Execute after 7d timelock
+cancelMint()                                       // Cancel pending mint
 upgradeToAndCall(address newImpl, bytes data)      // UUPS upgrade
 ```
 
