@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-10-17
+
 ### Added
 
+- Uniswap V4 pool integration and documentation
+- Aragon DAO integration with comprehensive testing
+- Zodiac Safe testing and configuration
+- Automated deployment system for Sepolia network
 - GitHub Actions CI/CD pipeline with automated testing, linting, and coverage
 - ESLint configuration for TypeScript code quality
 - Prettier for consistent code formatting (TypeScript, Solidity, JSON, Markdown)
@@ -27,8 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Restructured documentation for better organization
+- Updated QUICK_START guide with localhost configuration
+- Updated OpenZeppelin deployment information
 - Updated README.md with linting commands and new documentation links
 - Improved project organization and tooling
+
+### Fixed
+
+- Prevented prettier from formatting submodule files
 
 ### Removed
 
@@ -151,5 +164,6 @@ Do NOT open public issues for security vulnerabilities.
 
 ---
 
-[Unreleased]: https://github.com/cyberia-to/cyberia-token/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/cyberia-to/cyberia-token/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/cyberia-to/cyberia-token/compare/v1.1.0...v1.2.0
 [1.0.0]: https://github.com/cyberia-to/cyberia-token/releases/tag/v1.0.0
