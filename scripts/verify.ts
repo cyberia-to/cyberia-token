@@ -1,6 +1,7 @@
 import { run, network } from "hardhat";
 import { getNetworkConfig } from "./config/environments";
 import { getDeployment } from "./utils/deployment-tracker";
+import { runPostDeploymentUpdates } from "./utils/post-deployment";
 
 async function getAddressesToVerify(networkName: string): Promise<{ proxy: string; implementation: string }> {
   let proxyAddress = process.env.CAP_TOKEN_ADDRESS;
@@ -169,7 +170,13 @@ async function main() {
     // Update deployment record
     await updateDeploymentRecord(networkName, implementationVerified);
 
+    // Run post-deployment updates if verification succeeded
     if (implementationVerified) {
+      const deployment = getDeployment(networkName);
+      if (deployment) {
+        deployment.verified = true;
+        await runPostDeploymentUpdates(networkName, deployment);
+      }
       console.log("\n🎉 Verification completed successfully!");
     } else {
       console.log("\n⚠️  Verification completed with warnings. Check the logs above.");

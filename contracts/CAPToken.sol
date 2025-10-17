@@ -7,7 +7,6 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 contract CAPToken is
@@ -15,10 +14,11 @@ contract CAPToken is
 	ERC20Upgradeable,
 	ERC20PermitUpgradeable,
 	ERC20VotesUpgradeable,
-	OwnableUpgradeable,
 	UUPSUpgradeable,
 	ReentrancyGuardUpgradeable
 {
+	// Governance address - the only privileged address (typically an Aragon DAO)
+	address public governance;
 	// Constants
 	uint256 public constant BASIS_POINTS_DENOMINATOR = 10_000; // 100% = 10000 bp
 	uint256 public constant MAX_TAX_BP = 500; // 5% per individual tax
@@ -26,6 +26,9 @@ contract CAPToken is
 	uint256 public constant INITIAL_SUPPLY = 1_000_000_000 ether; // 1e9 * 1e18
 	uint256 public constant MAX_SUPPLY = 10_000_000_000 ether; // 10B max supply cap (10x initial)
 	uint256 public constant TAX_CHANGE_DELAY = 24 hours; // Timelock delay for tax changes
+	uint256 public constant MINT_DELAY = 7 days; // Timelock delay for minting operations (7 days)
+	uint256 public constant MINT_CAP_PER_PERIOD = 100_000_000 ether; // Max 100M tokens per 30-day period
+	uint256 public constant MINT_PERIOD = 30 days; // Rolling 30-day period for mint cap
 
 	// Tax parameters (in basis points)
 	// transferTaxBp: applied to non-pool <-> non-pool transfers and to sells in addition to sellTaxBp (hybrid rule)
@@ -39,10 +42,18 @@ contract CAPToken is
 	uint256 public pendingBuyTaxBp;
 	uint256 public taxChangeTimestamp; // When pending taxes can be applied
 
+	// Minting controls (timelock + rate limiting)
+	address public pendingMintTo;
+	uint256 public pendingMintAmount;
+	uint256 public mintTimestamp; // When pending mint can be executed
+	uint256 public lastMintPeriodStart; // Start of current 30-day period
+	uint256 public mintedInCurrentPeriod; // Amount minted in current period
+
 	address public feeRecipient; // zero address means burn mode (burns collected taxes)
 	mapping(address => bool) public isPool; // AMM pair addresses
 
 	// Events
+	event GovernanceTransferred(address indexed previousGovernance, address indexed newGovernance);
 	event PoolAdded(address indexed pool);
 	event PoolRemoved(address indexed pool);
 	event TaxChangeProposed(uint256 transferTaxBp, uint256 sellTaxBp, uint256 buyTaxBp, uint256 effectiveTime);
@@ -51,7 +62,15 @@ contract CAPToken is
 	event FeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
 	event TaxBurned(address indexed from, address indexed to, uint256 grossAmount, uint256 taxAmount);
 	event TaxCollected(address indexed from, address indexed to, uint256 grossAmount, uint256 taxAmount, address indexed recipient);
+	event MintProposed(address indexed to, uint256 amount, uint256 effectiveTime);
+	event MintCancelled(address indexed to, uint256 amount);
 	event TokensMinted(address indexed to, uint256 amount);
+
+	/// @notice Modifier to restrict access to governance address only
+	modifier onlyGovernance() {
+		require(msg.sender == governance, "ONLY_GOVERNANCE");
+		_;
+	}
 
 	/// @custom:oz-upgrades-unsafe-allow constructor
 	constructor() {
@@ -59,15 +78,20 @@ contract CAPToken is
 	}
 
 	/// @notice Initialize the token contract
-	/// @param _owner The initial owner address (typically the DAO governance contract)
+	/// @param _governance The initial governance address (deployer initially, then transfer to Aragon DAO)
 	/// @param _feeRecipient The fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected
-	function initialize(address _owner, address _feeRecipient) public initializer {
+	/// @dev SECURITY: After deployment, call setGovernance() to transfer control to the Aragon DAO
+	function initialize(address _governance, address _feeRecipient) public initializer {
+		require(_governance != address(0), "ZERO_GOVERNANCE");
+
 		__ERC20_init("Cyberia", "CAP");
 		__ERC20Permit_init("Cyberia");
 		__ERC20Votes_init();
-		__Ownable_init(_owner);
 		__UUPSUpgradeable_init();
 		__ReentrancyGuard_init();
+
+		// Set governance address (initially deployer, then transferred to DAO)
+		governance = _governance;
 
 		// Default taxes per spec
 		transferTaxBp = 100; // 1%
@@ -76,13 +100,28 @@ contract CAPToken is
 
 		feeRecipient = _feeRecipient; // recommended to be DAO safe; zero address enables burn mode
 
-		// Initial supply to owner/treasury per spec
-		_mint(_owner, INITIAL_SUPPLY);
+		// Initialize minting period tracking
+		lastMintPeriodStart = block.timestamp;
+		mintedInCurrentPeriod = 0;
+
+		// Initial supply to governance address
+		_mint(_governance, INITIAL_SUPPLY);
+	}
+
+	/// @notice Transfer governance to a new address (typically an Aragon DAO)
+	/// @param _newGovernance The new governance address
+	/// @dev Only callable by current governance. Use this to transfer control to the DAO after deployment.
+	function setGovernance(address _newGovernance) external onlyGovernance {
+		require(_newGovernance != address(0), "ZERO_GOVERNANCE");
+		address oldGovernance = governance;
+		governance = _newGovernance;
+		emit GovernanceTransferred(oldGovernance, _newGovernance);
 	}
 
 	// Admin functions
 	/// @notice Propose new tax rates (requires timelock delay before applying)
-	function proposeTaxChange(uint256 _transferTaxBp, uint256 _sellTaxBp, uint256 _buyTaxBp) external onlyOwner {
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function proposeTaxChange(uint256 _transferTaxBp, uint256 _sellTaxBp, uint256 _buyTaxBp) external onlyGovernance {
 		require(_transferTaxBp <= MAX_TAX_BP, "TRANSFER_TAX_TOO_HIGH");
 		require(_sellTaxBp <= MAX_TAX_BP, "SELL_TAX_TOO_HIGH");
 		require(_buyTaxBp <= MAX_TAX_BP, "BUY_TAX_TOO_HIGH");
@@ -99,7 +138,8 @@ contract CAPToken is
 	}
 
 	/// @notice Apply pending tax changes after timelock delay
-	function applyTaxChange() external onlyOwner {
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function applyTaxChange() external onlyGovernance {
 		require(taxChangeTimestamp != 0, "NO_PENDING_CHANGE");
 		require(block.timestamp >= taxChangeTimestamp, "TIMELOCK_NOT_EXPIRED");
 
@@ -114,8 +154,8 @@ contract CAPToken is
 	}
 
 	/// @notice Cancel a pending tax change before it takes effect
-	/// @dev Allows governance to abort a proposed tax change during the timelock period
-	function cancelTaxChange() external onlyOwner {
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function cancelTaxChange() external onlyGovernance {
 		require(taxChangeTimestamp != 0, "NO_PENDING_CHANGE");
 
 		// Store the cancelled values for the event
@@ -132,36 +172,27 @@ contract CAPToken is
 		emit TaxChangeCancelled(cancelledTransfer, cancelledSell, cancelledBuy);
 	}
 
-	/// @notice Set taxes immediately (for initialization or emergency - use with caution)
-	/// @dev This bypasses the timelock and should only be used during initial setup
-	function setTaxesImmediate(uint256 _transferTaxBp, uint256 _sellTaxBp, uint256 _buyTaxBp) external onlyOwner {
-		require(_transferTaxBp <= MAX_TAX_BP, "TRANSFER_TAX_TOO_HIGH");
-		require(_sellTaxBp <= MAX_TAX_BP, "SELL_TAX_TOO_HIGH");
-		require(_buyTaxBp <= MAX_TAX_BP, "BUY_TAX_TOO_HIGH");
-		require(_transferTaxBp + _sellTaxBp <= MAX_COMBINED_TAX_BP, "COMBINED_SELL_TAX_TOO_HIGH");
-
-		transferTaxBp = _transferTaxBp;
-		sellTaxBp = _sellTaxBp;
-		buyTaxBp = _buyTaxBp;
-		emit TaxesUpdated(_transferTaxBp, _sellTaxBp, _buyTaxBp);
-	}
-
 	/// @notice Update the fee recipient address
 	/// @param _feeRecipient The new fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected
-	function setFeeRecipient(address _feeRecipient) external onlyOwner {
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function setFeeRecipient(address _feeRecipient) external onlyGovernance {
 		address oldRecipient = feeRecipient;
 		feeRecipient = _feeRecipient; // zero address enables burn mode
 		emit FeeRecipientUpdated(oldRecipient, _feeRecipient);
 	}
 
-	function addPool(address pool) external onlyOwner {
+	/// @notice Add a pool address for tax calculations
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function addPool(address pool) external onlyGovernance {
 		require(pool != address(0), "ZERO_ADDR");
 		require(!isPool[pool], "EXISTS");
 		isPool[pool] = true;
 		emit PoolAdded(pool);
 	}
 
-	function removePool(address pool) external onlyOwner {
+	/// @notice Remove a pool address from tax calculations
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function removePool(address pool) external onlyGovernance {
 		require(isPool[pool], "NOT_POOL");
 		delete isPool[pool];
 		emit PoolRemoved(pool);
@@ -176,15 +207,76 @@ contract CAPToken is
 		_burn(account, amount);
 	}
 
-	/// @notice Mint new tokens - restricted to owner for future bridging/OFT needs
-	/// @dev Only callable by owner (DAO governance). Uses canonical _mint() which emits Transfer(0x0, to, amount)
+	/// @notice Propose minting new tokens (requires 7-day timelock before executing)
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute()). Subject to rate limiting.
 	/// @param to Address to receive minted tokens
 	/// @param amount Amount of tokens to mint
-	function mint(address to, uint256 amount) external onlyOwner {
+	function proposeMint(address to, uint256 amount) external onlyGovernance {
 		require(to != address(0), "MINT_TO_ZERO");
 		require(totalSupply() + amount <= MAX_SUPPLY, "EXCEEDS_MAX_SUPPLY");
+
+		// Reset period if needed
+		if (block.timestamp >= lastMintPeriodStart + MINT_PERIOD) {
+			lastMintPeriodStart = block.timestamp;
+			mintedInCurrentPeriod = 0;
+		}
+
+		// Check rate limiting
+		require(mintedInCurrentPeriod + amount <= MINT_CAP_PER_PERIOD, "EXCEEDS_MINT_CAP_PER_PERIOD");
+
+		pendingMintTo = to;
+		pendingMintAmount = amount;
+		mintTimestamp = block.timestamp + MINT_DELAY;
+
+		emit MintProposed(to, amount, mintTimestamp);
+	}
+
+	/// @notice Execute pending mint after timelock delay
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function executeMint() external onlyGovernance {
+		require(mintTimestamp != 0, "NO_PENDING_MINT");
+		require(block.timestamp >= mintTimestamp, "MINT_TIMELOCK_NOT_EXPIRED");
+		require(pendingMintTo != address(0), "MINT_TO_ZERO");
+
+		address to = pendingMintTo;
+		uint256 amount = pendingMintAmount;
+
+		// Reset period if needed
+		if (block.timestamp >= lastMintPeriodStart + MINT_PERIOD) {
+			lastMintPeriodStart = block.timestamp;
+			mintedInCurrentPeriod = 0;
+		}
+
+		// Final checks
+		require(totalSupply() + amount <= MAX_SUPPLY, "EXCEEDS_MAX_SUPPLY");
+		require(mintedInCurrentPeriod + amount <= MINT_CAP_PER_PERIOD, "EXCEEDS_MINT_CAP_PER_PERIOD");
+
+		// Update tracking
+		mintedInCurrentPeriod += amount;
+
+		// Reset pending state
+		pendingMintTo = address(0);
+		pendingMintAmount = 0;
+		mintTimestamp = 0;
+
 		_mint(to, amount);
 		emit TokensMinted(to, amount);
+	}
+
+	/// @notice Cancel a pending mint before it takes effect
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function cancelMint() external onlyGovernance {
+		require(mintTimestamp != 0, "NO_PENDING_MINT");
+
+		address to = pendingMintTo;
+		uint256 amount = pendingMintAmount;
+
+		// Reset pending state
+		pendingMintTo = address(0);
+		pendingMintAmount = 0;
+		mintTimestamp = 0;
+
+		emit MintCancelled(to, amount);
 	}
 
 	// Internal tax logic applied on transfers
@@ -235,7 +327,8 @@ contract CAPToken is
 	}
 
 	// UUPS authorization
-	function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	function _authorizeUpgrade(address newImplementation) internal override onlyGovernance {}
 
 	// Required overrides for Solidity
 	function nonces(address owner) public view override(ERC20PermitUpgradeable, NoncesUpgradeable) returns (uint256) {

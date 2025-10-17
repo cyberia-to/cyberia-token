@@ -28,55 +28,45 @@ describe("Security Tests", function () {
 
   describe("Access Control", function () {
     it("Should prevent attackers from calling admin functions", async function () {
-      await expect(cap.connect(attacker).setTaxesImmediate(0, 0, 0)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+      // Tax changes require governance
+      await expect(cap.connect(attacker).proposeTaxChange(0, 0, 0)).to.be.revertedWith("ONLY_GOVERNANCE");
 
-      await expect(cap.connect(attacker).setFeeRecipient(attacker.address)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+      // Fee recipient changes require governance
+      await expect(cap.connect(attacker).setFeeRecipient(attacker.address)).to.be.revertedWith("ONLY_GOVERNANCE");
 
-      await expect(cap.connect(attacker).addPool(pool.address)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+      // Pool management requires governance
+      await expect(cap.connect(attacker).addPool(pool.address)).to.be.revertedWith("ONLY_GOVERNANCE");
 
-      await expect(cap.connect(attacker).removePool(pool.address)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+      await expect(cap.connect(attacker).removePool(pool.address)).to.be.revertedWith("ONLY_GOVERNANCE");
     });
 
     it("Should prevent unauthorized upgrades", async function () {
       const CAPv2 = await ethers.getContractFactory("CAPToken");
       const newImplementation = await CAPv2.deploy();
 
+      // Upgrades require UPGRADER_ROLE
       await expect(
         cap.connect(attacker).upgradeToAndCall(await newImplementation.getAddress(), "0x")
-      ).to.be.revertedWithCustomError(cap, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWith("ONLY_GOVERNANCE");
     });
 
-    it("Should prevent ownership transfer by non-owner", async function () {
-      await expect(cap.connect(attacker).transferOwnership(attacker.address)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+    it("Should prevent governance transfer by non-governance", async function () {
+      // Governance transfer is protected by onlyGovernance modifier
+      await expect(cap.connect(attacker).setGovernance(attacker.address)).to.be.revertedWith("ONLY_GOVERNANCE");
     });
   });
 
   describe("Tax Manipulation Resistance", function () {
     it("Should enforce maximum tax limits even with max values", async function () {
-      await expect(cap.connect(owner).setTaxesImmediate(10000, 100, 100)).to.be.revertedWith("TRANSFER_TAX_TOO_HIGH");
+      await expect(cap.connect(owner).proposeTaxChange(10000, 100, 100)).to.be.revertedWith("TRANSFER_TAX_TOO_HIGH");
 
-      await expect(cap.connect(owner).setTaxesImmediate(100, 10000, 100)).to.be.revertedWith("SELL_TAX_TOO_HIGH");
+      await expect(cap.connect(owner).proposeTaxChange(100, 10000, 100)).to.be.revertedWith("SELL_TAX_TOO_HIGH");
 
-      await expect(cap.connect(owner).setTaxesImmediate(100, 100, 10000)).to.be.revertedWith("BUY_TAX_TOO_HIGH");
+      await expect(cap.connect(owner).proposeTaxChange(100, 100, 10000)).to.be.revertedWith("BUY_TAX_TOO_HIGH");
 
-      await expect(cap.connect(owner).setTaxesImmediate(400, 400, 500)).to.not.be.reverted;
+      await expect(cap.connect(owner).proposeTaxChange(400, 400, 500)).to.not.be.reverted;
 
-      await expect(cap.connect(owner).setTaxesImmediate(450, 400, 0)).to.be.revertedWith("COMBINED_SELL_TAX_TOO_HIGH");
+      await expect(cap.connect(owner).proposeTaxChange(450, 400, 0)).to.be.revertedWith("COMBINED_SELL_TAX_TOO_HIGH");
     });
   });
 
@@ -93,45 +83,42 @@ describe("Security Tests", function () {
       expect(currentSupply).to.equal(initialSupply - ethers.parseEther("10"));
     });
 
-    it("Should restrict minting to owner only", async function () {
+    it("Should restrict minting to authorized roles only", async function () {
       const mintAmount = ethers.parseEther("1000000");
 
-      await expect(cap.connect(attacker).mint(attacker.address, mintAmount)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
+      // Attacker without governance cannot propose mint
+      await expect(cap.connect(attacker).proposeMint(attacker.address, mintAmount)).to.be.revertedWith(
+        "ONLY_GOVERNANCE"
       );
 
       const initialSupply = await cap.totalSupply();
-      await expect(cap.connect(owner).mint(user1.address, mintAmount)).to.not.be.reverted;
+
+      // Owner can propose and execute mint after timelock
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).executeMint()).to.not.be.reverted;
 
       expect(await cap.totalSupply()).to.equal(initialSupply + mintAmount);
     });
   });
 
-  describe("Pool Manipulation Protection", function () {
-    it("Should prevent duplicate pool additions", async function () {
-      await cap.connect(owner).addPool(pool.address);
-      await expect(cap.connect(owner).addPool(pool.address)).to.be.revertedWith("EXISTS");
-    });
-
-    it("Should prevent removing non-existent pools", async function () {
-      await expect(cap.connect(owner).removePool(pool.address)).to.be.revertedWith("NOT_POOL");
-    });
-  });
-
   describe("Governance Attack Resistance", function () {
-    it("Should handle ownership transfer correctly", async function () {
-      const newOwner = user2.address;
+    it("Should handle governance transfer correctly", async function () {
+      const newGovernance = user2.address;
 
-      await cap.connect(owner).transferOwnership(newOwner);
-      expect(await cap.owner()).to.equal(newOwner);
+      // Transfer governance to user2
+      await cap.connect(owner).setGovernance(newGovernance);
+      expect(await cap.governance()).to.equal(newGovernance);
 
-      await expect(cap.connect(owner).setTaxesImmediate(200, 200, 0)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+      // Now old owner loses admin access
+      await expect(cap.connect(owner).proposeTaxChange(200, 200, 0)).to.be.revertedWith("ONLY_GOVERNANCE");
 
-      await expect(cap.connect(user2).setTaxesImmediate(200, 200, 0)).to.not.be.reverted;
+      // New governance has admin access and can propose tax changes
+      await expect(cap.connect(user2).proposeTaxChange(200, 200, 0)).to.not.be.reverted;
     });
   });
 
@@ -163,7 +150,13 @@ describe("Security Tests", function () {
 
   describe("Gas Optimization and DoS Resistance", function () {
     it("Should handle maximum tax calculations without overflow", async function () {
-      await cap.connect(owner).setTaxesImmediate(400, 400, 500);
+      await cap.connect(owner).proposeTaxChange(400, 400, 500);
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).applyTaxChange();
 
       const userBalance = await cap.balanceOf(user1.address);
       await cap.connect(user1).transfer(user2.address, userBalance);

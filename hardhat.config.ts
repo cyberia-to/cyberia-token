@@ -91,12 +91,9 @@ const config: HardhatUserConfig = {
     },
   },
 
-  // Etherscan verification
+  // Etherscan verification (V2 API)
   etherscan: {
-    apiKey: {
-      sepolia: ETHERSCAN_API_KEY,
-      mainnet: ETHERSCAN_API_KEY,
-    },
+    apiKey: ETHERSCAN_API_KEY,
   },
 
   // Gas reporter (useful for optimization)

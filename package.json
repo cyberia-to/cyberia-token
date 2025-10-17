@@ -59,10 +59,14 @@
     "configure:sepolia": "hardhat run --network sepolia scripts/configure.ts",
     "verify:sepolia": "hardhat run --network sepolia scripts/verify.ts",
     "verify:mainnet": "hardhat run --network mainnet scripts/verify.ts",
+    "validate:deployment": "hardhat run scripts/validate-deployment.ts",
+    "validate:deployment:sepolia": "hardhat run --network sepolia scripts/validate-deployment.ts",
+    "validate:deployment:mainnet": "hardhat run --network mainnet scripts/validate-deployment.ts",
     "validate:zodiac": "ts-node scripts/validate-zodiac-config.ts",
     "update-readme": "ts-node scripts/update-readme-deployment.ts",
     "deploy": "npm run deploy:sepolia",
-    "prepare": "husky"
+    "prepare": "husky",
+    "console:sepolia": "hardhat console --network sepolia"
   },
   "engines": {
     "node": ">=20.0.0",

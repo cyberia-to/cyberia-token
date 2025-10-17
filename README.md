@@ -1,6 +1,6 @@
 # Cyberia (CAP) Token
 
-[![Tests](https://img.shields.io/badge/Tests-256%2F256%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
+[![Tests](https://img.shields.io/badge/Tests-256%2F256%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
 
 Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx DAO.
 
@@ -11,25 +11,34 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 - **Configurable Tax System**: Transfer/buy/sell taxes (max 5% each, 8% combined) with 24h timelock
 - **AMM Integration**: Pool detection for Uniswap and other DEXs
 - **Burn Mechanism**: Token burning and optional burn mode for taxes
-- **Bridging Ready**: Owner-gated minting (max 10B supply) for future OFT/LayerZero bridging
+- **Bridging Ready**: Governance-gated minting (max 10B supply) for future OFT/LayerZero bridging
 - **DAO Governance**: Aragon OSx integration with token-voting plugin
 
 ## Deployed Contracts
 
 ### Sepolia Testnet
 
-| Component             | Address                                      | Link                                                                                           |
-| --------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Token Proxy**       | `0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e` | [Etherscan](https://sepolia.etherscan.io/address/0x7DA17a0F5A7D6AD43f1Ff4158D1818b03DE56e4e)   |
-| **Implementation**    | `0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad` | [Etherscan](https://sepolia.etherscan.io/address/0x7e2c2d1eC3f3f181640a3F1894A0299D6D5f46Ad)   |
-| **Aragon DAO**        | `0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33` | [Aragon App](https://app.aragon.org/#/daos/sepolia/0x7AFAa93021b4b267DBB5DA7F2721BE23Bd77eE33) |
-| **Governance Plugin** | `0x295878F28f403EE6e6C6b4474e8E123022063b24` | [Etherscan](https://sepolia.etherscan.io/address/0x295878F28f403EE6e6C6b4474e8E123022063b24)   |
-| **Uniswap V4 Pool**   | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` | [Etherscan](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543)   |
+| Component          | Address                                      | Link                                                                                         |
+| ------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Token Proxy**    | `0xA6B680A88c16056de7194CF775D04A45D0692C11` | [Etherscan](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) |
+| **Implementation** | `0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623` | [Etherscan](https://sepolia.etherscan.io/address/0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623) |
+| **Governance**     | `0x9B9bD768891F014fF72864862EF14f139084992D` | Deployer (temporary - transfer to DAO when ready)                                            |
+| **Fee Recipient**  | `0x37Bb361F12D10F31a963033e1D0B3bb3026D6654` | Treasury wallet                                                                              |
+| **Aragon DAO**     | Not deployed yet                             | Pending setup                                                                                |
+| **Gnosis Safe**    | Not deployed yet                             | Pending setup                                                                                |
+| **AMM Pool**       | Not deployed yet                             | Pending setup                                                                                |
 
-**Pool Details**: CAP/WETH pair | 0.3% fee | Initial price: 100,000 CAP = 1 ETH
-**Pool Creation**: [TX](https://sepolia.etherscan.io/tx/0x35bc25cd4426bf4959ec96adc6fa95cfcea528527e00f183fdcf7c6467170888) | **DAO Proposal**: [TX](https://sepolia.etherscan.io/tx/0x065fb9c34cf70e5a896f0e1a2036819230286696870a32858822c8e9061cdb4c)
+**Deployment**: October 17, 2025 | **TX**: [0x2ef3e...509ab](https://sepolia.etherscan.io/tx/0x2ef3ed1760d42d0fd73bcad5498ea43deb5db0b280fe08edc7c81778975509ab) | **Block**: 7393742
 
-**Version**: v1.1.0 | **Status**: ✅ Verified | ✅ DAO Governance Active | ⚠️ Not audited
+**Version**: v1.0.0 | **Status**: ✅ Verified | ⏳ DAO Setup Pending | ⚠️ Not audited
+
+**Next Steps:**
+
+1. Setup Aragon DAO with token-voting plugin
+2. Deploy Gnosis Safe for treasury management
+3. Configure Zodiac Roles module
+4. Transfer governance to DAO
+5. Create AMM liquidity pool
 
 ### Mainnet
 
@@ -54,8 +63,6 @@ cp .env.example .env         # Configure environment variables
 npm run deploy:sepolia       # Deploy to Sepolia
 npm run verify:sepolia       # Verify on Etherscan
 ```
-
-See [Development Guide](docs/DEVELOPMENT.md) for detailed setup instructions.
 
 ## Token Info
 
@@ -92,7 +99,7 @@ SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 PRIVATE_KEY=0x...
 ETHERSCAN_API_KEY=...
-SEPOLIA_OWNER_ADDRESS=0x...      # DAO address
+SEPOLIA_OWNER_ADDRESS=0x...      # Initial governance address (deployer, then transfer to DAO)
 SEPOLIA_FEE_RECIPIENT=0x...      # Treasury address
 ```
 
@@ -109,8 +116,6 @@ SEPOLIA_FEE_RECIPIENT=0x...      # Treasury address
 npm run verify:sepolia           # Verify contract on Etherscan
 npm run configure:sepolia        # Configure pools and settings
 ```
-
-See [Deployment Guide](docs/DEPLOYMENT.md) for complete deployment procedures.
 
 ## Testing
 
@@ -162,7 +167,7 @@ npm run validate:zodiac     # Validate Zodiac roles config
 
 ## Contract Administration
 
-Owner-only functions (DAO governance):
+Governance-only functions (DAO controlled):
 
 ### Tax Management (with 24h Timelock)
 
@@ -207,10 +212,10 @@ upgradeToAndCall(address newImpl, bytes data)      // UUPS upgrade
 }
 ```
 
-Transfer ownership:
+Transfer governance to DAO:
 
 ```solidity
-capToken.transferOwnership(DAO_ADDRESS);
+capToken.setGovernance(DAO_ADDRESS);
 ```
 
 ### Gnosis Safe + Zodiac
@@ -228,7 +233,7 @@ capToken.transferOwnership(DAO_ADDRESS);
 - **DAO_LARGE_OPS**: Large transfers (>200k CAP) require DAO governance approval
 - **DAO_TOKEN_ADMIN**: All token admin functions (taxes, pools, upgrades) restricted to DAO
 
-See [full deployment guide](docs/DEPLOYMENT.md#zodiac-roles-configuration) and [Safe setup guide](docs/safe-setup-guide.md).
+See [Aragon Integration Guide](docs/aragon-integration.md) and [Safe Setup Guide](docs/safe-setup-guide.md) for detailed instructions.
 
 ## Architecture
 
@@ -244,15 +249,9 @@ Board Members
 
 ## Documentation
 
-- [Development Guide](docs/DEVELOPMENT.md) - Setup, workflow, testing, CI/CD
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment procedures
-- [Governance Guide](docs/GOVERNANCE.md) - Tax management, timelock workflow
-- [Uniswap Pool Setup](docs/UNISWAP_POOL_SETUP.md) - Create and register liquidity pools
-- [Aragon Integration](docs/aragon-integration.md) - DAO governance integration
-- [Safe Setup Guide](docs/safe-setup-guide.md) - Gnosis Safe + Zodiac configuration
-- [Foundry Testing](docs/FOUNDRY.md) - Property-based and invariant testing
-- [Quick Start](docs/QUICK_START.md) - Get started quickly
-- [Contract API](docs/api/index.md) - Auto-generated API documentation
+- [Aragon Integration Guide](docs/aragon-integration.md) - DAO governance integration and token-voting setup
+- [Safe Setup Guide](docs/safe-setup-guide.md) - Gnosis Safe + Zodiac Roles configuration
+- [Zodiac Roles Config](docs/zodiac-roles-config.json) - Production-ready policy enforcing "Board + DAO" governance
 
 ## Security
 

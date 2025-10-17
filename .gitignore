@@ -27,6 +27,9 @@ broadcast/
 deployments.json
 gas-report.txt
 
+# Auto-generated deployment summaries
+DEPLOYMENT_*.md
+
 # Coverage reports
 coverage/
 coverage.json

@@ -2,6 +2,12 @@
 
 This guide explains how to set up a Gnosis Safe with Zodiac Roles module for Cyberia DAO treasury management.
 
+> **📋 Current Status (Sepolia):**
+> ✅ CAP Token deployed: `0xA6B680A88c16056de7194CF775D04A45D0692C11`
+> ⏳ Aragon DAO: Not deployed yet
+> ⏳ Gnosis Safe: Not deployed yet (use this guide for setup)
+> ⏳ Zodiac Roles: Not configured yet (use this guide for setup)
+
 ## Overview
 
 The recommended architecture provides:
@@ -9,8 +15,7 @@ The recommended architecture provides:
 - **Board Operations**: Daily operations up to 50k CAP
 - **Medium Operations**: Transfers 50k-200k CAP (higher threshold)
 - **DAO Oversight**: Large transfers >200k CAP require governance
-- **Token Administration**: All CAP token changes require DAO approval
-- **Emergency Controls**: Ability to disable taxes in emergencies
+- **Token Administration**: All CAP token changes require DAO approval (no bypass)
 
 ## Architecture Diagram
 
@@ -32,10 +37,10 @@ The recommended architecture provides:
 
 ## Prerequisites
 
-- Deployed CAP token
-- Aragon DAO with token-voting
-- Board member addresses
-- Treasury setup requirements
+- ✅ Deployed CAP token
+- ⏳ Aragon DAO with token-voting (setup first - see [aragon-integration.md](aragon-integration.md))
+- ⏳ Board member addresses
+- ⏳ Treasury setup requirements
 
 ## Step 1: Deploy Gnosis Safe
 
@@ -267,15 +272,15 @@ const setFeeRecipientAction = {
 // Submit as DAO proposal
 ```
 
-### 5.2 Transfer Token Ownership
+### 5.2 Transfer Token Governance
 
-Transfer CAP token ownership to Aragon DAO:
+Transfer CAP token governance to Aragon DAO:
 
 ```javascript
-const transferOwnershipAction = {
+const setGovernanceAction = {
   to: capTokenAddress,
   value: 0,
-  data: capTokenInterface.encodeFunctionData("transferOwnership", [aragonDaoAddress]),
+  data: capTokenInterface.encodeFunctionData("setGovernance", [aragonDaoAddress]),
 };
 
 // Submit as DAO proposal
@@ -310,9 +315,9 @@ const transferOwnershipAction = {
 
 ### Emergency Procedures
 
-1. **Disable taxes**: Board can set all taxes to 0%
-2. **Emergency contacts**: Predefined escalation path
-3. **DAO override**: DAO can override any board action
+1. **Tax changes**: Require DAO proposal (24h timelock, no emergency bypass)
+2. **Emergency contacts**: Predefined escalation path for urgent DAO proposals
+3. **DAO governance**: DAO controls all token administration (taxes, pools, upgrades)
 
 ## Monitoring & Maintenance
 
@@ -343,15 +348,15 @@ const transferOwnershipAction = {
 
 1. **Transaction Fails**: Check role permissions and limits
 2. **Module Not Enabled**: Verify Zodiac installation
-3. **DAO Can't Execute**: Confirm ownership transfer
-4. **Emergency Access**: Test disable-tax capability
+3. **DAO Can't Execute**: Confirm governance transfer
+4. **Tax Changes**: All require DAO proposal + 24h timelock (no emergency override)
 
 ### Recovery Procedures
 
 1. **Lost Board Keys**: Use DAO to update Safe owners
 2. **Module Failure**: DAO can disable/replace module
-3. **Safe Compromise**: DAO can change treasury address
-4. **DAO Compromise**: Board has limited emergency powers
+3. **Safe Compromise**: DAO can change treasury address (fee recipient)
+4. **Urgent Changes**: DAO proposals required (24h timelock for taxes, 7d for minting)
 
 ## Resources
 

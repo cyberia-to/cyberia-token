@@ -382,15 +382,18 @@ contract CAPTokenUnitTest is Test {
 		token.setFeeRecipient(newRecipient);
 	}
 
-	/// @notice Test mint emits TokensMinted and Transfer events
-	function test_Mint_EmitsEvents() public {
+	/// @notice Test executeMint emits TokensMinted and Transfer events
+	function test_ExecuteMint_EmitsEvents() public {
 		uint256 mintAmount = 1000 ether;
+
+		token.proposeMint(alice, mintAmount);
+		vm.warp(block.timestamp + 7 days);
 
 		// Check TokensMinted event
 		vm.expectEmit(true, true, true, true);
 		emit TokensMinted(alice, mintAmount);
 
-		token.mint(alice, mintAmount);
+		token.executeMint();
 	}
 
 	/// @notice Test transfer with tax emits TaxCollected event
@@ -418,16 +421,19 @@ contract CAPTokenUnitTest is Test {
 		token.transfer(alice, transferAmount);
 	}
 
-	/// @notice Test setTaxesImmediate emits TaxesUpdated event
-	function test_SetTaxesImmediate_EmitsEvent() public {
+	/// @notice Test cancelTaxChange emits TaxChangeCancelled event
+	function test_CancelTaxChange_EmitsEvent() public {
 		uint256 newTransferTax = 200;
 		uint256 newSellTax = 300;
 		uint256 newBuyTax = 100;
 
-		vm.expectEmit(true, true, true, true);
-		emit TaxesUpdated(newTransferTax, newSellTax, newBuyTax);
+		token.proposeTaxChange(newTransferTax, newSellTax, newBuyTax);
 
-		token.setTaxesImmediate(newTransferTax, newSellTax, newBuyTax);
+		// Cancel the pending change
+		token.cancelTaxChange();
+
+		// Verify timestamp reset
+		assertEq(token.taxChangeTimestamp(), 0);
 	}
 
 	/*//////////////////////////////////////////////////////////////
@@ -460,18 +466,20 @@ contract CAPTokenUnitTest is Test {
 		token.setFeeRecipient(alice);
 	}
 
-	/// @notice Test only owner can mint
-	function test_Mint_OnlyOwner() public {
+	/// @notice Test only minter role can propose mint
+	function test_ProposeMint_OnlyMinterRole() public {
 		vm.prank(alice);
 		vm.expectRevert();
-		token.mint(alice, 1000 ether);
+		token.proposeMint(alice, 1000 ether);
 	}
 
-	/// @notice Test only owner can set taxes immediately
-	function test_SetTaxesImmediate_OnlyOwner() public {
+	/// @notice Test only tax manager role can cancel tax change
+	function test_CancelTaxChange_OnlyTaxManagerRole() public {
+		token.proposeTaxChange(200, 300, 100);
+
 		vm.prank(alice);
 		vm.expectRevert();
-		token.setTaxesImmediate(200, 300, 100);
+		token.cancelTaxChange();
 	}
 
 	/*//////////////////////////////////////////////////////////////
@@ -501,19 +509,32 @@ contract CAPTokenUnitTest is Test {
 		token.removePool(pool);
 	}
 
-	/// @notice Test cannot mint to zero address
-	function test_Mint_RevertsOnZeroAddress() public {
+	/// @notice Test cannot propose mint to zero address
+	function test_ProposeMint_RevertsOnZeroAddress() public {
 		vm.expectRevert("MINT_TO_ZERO");
-		token.mint(address(0), 1000 ether);
+		token.proposeMint(address(0), 1000 ether);
 	}
 
-	/// @notice Test cannot mint beyond max supply
-	function test_Mint_RevertsOnMaxSupplyExceeded() public {
+	/// @notice Test cannot propose mint beyond max supply
+	function test_ProposeMint_RevertsOnMaxSupplyExceeded() public {
 		uint256 currentSupply = token.totalSupply();
 		uint256 exceedAmount = MAX_SUPPLY - currentSupply + 1;
 
 		vm.expectRevert("EXCEEDS_MAX_SUPPLY");
-		token.mint(alice, exceedAmount);
+		token.proposeMint(alice, exceedAmount);
+	}
+
+	/// @notice Test cannot execute mint beyond rate limit
+	function test_ExecuteMint_RevertsOnRateLimitExceeded() public {
+		// Propose and execute first mint (100M - at limit)
+		uint256 maxMintPerPeriod = 100_000_000 ether;
+		token.proposeMint(alice, maxMintPerPeriod);
+		vm.warp(block.timestamp + 7 days);
+		token.executeMint();
+
+		// Try to mint more in same period
+		vm.expectRevert("EXCEEDS_MINT_CAP_PER_PERIOD");
+		token.proposeMint(bob, 1 ether);
 	}
 
 	/// @notice Test burn reduces total supply
@@ -571,7 +592,7 @@ contract CAPTokenUnitTest is Test {
 		assertEq(token.decimals(), 18);
 		assertEq(token.totalSupply(), INITIAL_SUPPLY);
 		assertEq(token.balanceOf(owner), INITIAL_SUPPLY);
-		assertEq(token.owner(), owner);
+		assertEq(token.governance(), owner);
 		assertEq(token.feeRecipient(), feeRecipient);
 		assertEq(token.transferTaxBp(), 100); // 1%
 		assertEq(token.sellTaxBp(), 100); // 1%
@@ -589,11 +610,13 @@ contract CAPTokenUnitTest is Test {
   //////////////////////////////////////////////////////////////*/
 
 	/// @notice Test zero tax on mint
-	function test_Mint_NoTax() public {
+	function test_ExecuteMint_NoTax() public {
 		uint256 mintAmount = 1000 ether;
 		uint256 recipientBefore = token.balanceOf(feeRecipient);
 
-		token.mint(alice, mintAmount);
+		token.proposeMint(alice, mintAmount);
+		vm.warp(block.timestamp + 7 days);
+		token.executeMint();
 
 		assertEq(token.balanceOf(alice), mintAmount);
 		assertEq(token.balanceOf(feeRecipient), recipientBefore); // No tax collected
@@ -645,8 +668,10 @@ contract CAPTokenUnitTest is Test {
 		address pool = makeAddr("pool");
 		token.addPool(pool);
 
-		// Set buy tax
-		token.setTaxesImmediate(100, 100, 200); // 1% transfer, 1% sell, 2% buy
+		// Set buy tax via propose/apply
+		token.proposeTaxChange(100, 100, 200); // 1% transfer, 1% sell, 2% buy
+		vm.warp(block.timestamp + TAX_CHANGE_DELAY);
+		token.applyTaxChange();
 
 		// Give tokens to pool (owner pays transfer tax)
 		uint256 amount = 1000 ether;

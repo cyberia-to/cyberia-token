@@ -184,8 +184,14 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const initialSupply = await cap.totalSupply();
       const block0 = await ethers.provider.getBlockNumber();
 
-      // Mint tokens
-      await cap.connect(owner).mint(user1.address, ethers.parseEther("50000"));
+      // Propose and execute mint
+      await cap.connect(owner).proposeMint(user1.address, ethers.parseEther("50000"));
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).executeMint();
       await mine(1);
 
       const block1 = await ethers.provider.getBlockNumber();

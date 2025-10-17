@@ -49,7 +49,13 @@ describe("Edge Cases and Stress Tests", function () {
     });
 
     it("Should handle very small tax calculations", async function () {
-      await cap.connect(owner).setTaxesImmediate(1, 1, 1);
+      await cap.connect(owner).proposeTaxChange(1, 1, 1);
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).applyTaxChange();
       await cap.connect(owner).transfer(user1.address, ethers.parseEther("1"));
 
       const transferAmount = 100;
@@ -130,8 +136,14 @@ describe("Edge Cases and Stress Tests", function () {
       await cap.connect(user1).transfer(user2.address, transferAmount);
       const treasuryAfter1 = await cap.balanceOf(treasury.address);
 
-      // Change taxes
-      await cap.connect(owner).setTaxesImmediate(200, 300, 100); // 2%, 3%, 1%
+      // Change taxes through timelock
+      await cap.connect(owner).proposeTaxChange(200, 300, 100); // 2%, 3%, 1%
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).applyTaxChange();
 
       // Second transfer with new taxes
       await cap.connect(user1).transfer(user2.address, transferAmount);
@@ -176,6 +188,17 @@ describe("Edge Cases and Stress Tests", function () {
       expect(await cap.totalSupply()).to.equal(initialSupply - burnAmount);
       expect(await cap.balanceOf(user1.address)).to.equal(user1BalanceAfterTransfer - burnAmount);
       expect(await cap.allowance(user1.address, user2.address)).to.equal(0);
+    });
+  });
+
+  describe("Pool Management Edge Cases", function () {
+    it("Should prevent duplicate pool additions", async function () {
+      await cap.connect(owner).addPool(pool1.address);
+      await expect(cap.connect(owner).addPool(pool1.address)).to.be.revertedWith("EXISTS");
+    });
+
+    it("Should prevent removing non-existent pools", async function () {
+      await expect(cap.connect(owner).removePool(pool1.address)).to.be.revertedWith("NOT_POOL");
     });
   });
 

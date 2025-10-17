@@ -183,7 +183,9 @@ contract CAPTokenStatefulTest is Test {
 	/// @notice Stateful test: Burn and mint cycle
 	function testStateful_BurnMintCycle(uint256 burnAmount, uint256 mintAmount) public {
 		vm.assume(burnAmount > 0 && burnAmount <= token.balanceOf(alice) / 2);
+		uint256 maxMintPerPeriod = 100_000_000 ether; // Rate limit
 		vm.assume(mintAmount > 0 && mintAmount <= MAX_SUPPLY - token.totalSupply());
+		vm.assume(mintAmount <= maxMintPerPeriod); // Respect rate limit
 
 		uint256 initialSupply = token.totalSupply();
 
@@ -193,8 +195,10 @@ contract CAPTokenStatefulTest is Test {
 
 		assertEq(token.totalSupply(), initialSupply - burnAmount, "Supply should decrease by burn amount");
 
-		// Mint
-		token.mint(bob, mintAmount);
+		// Mint with timelock
+		token.proposeMint(bob, mintAmount);
+		vm.warp(block.timestamp + 7 days);
+		token.executeMint();
 
 		assertEq(token.totalSupply(), initialSupply - burnAmount + mintAmount, "Supply should reflect burn and mint");
 	}
@@ -306,8 +310,10 @@ contract CAPTokenStatefulTest is Test {
 		token.transfer(bob, amount);
 		uint256 tax1 = token.balanceOf(feeRecipient) - treasuryBefore;
 
-		// Change taxes
-		token.setTaxesImmediate(200, 300, 50); // 2%, 3%, 0.5%
+		// Change taxes with timelock
+		token.proposeTaxChange(200, 300, 50); // 2%, 3%, 0.5%
+		vm.warp(block.timestamp + 24 hours);
+		token.applyTaxChange();
 
 		// Transfer with new tax (2%)
 		treasuryBefore = token.balanceOf(feeRecipient);
@@ -389,7 +395,9 @@ contract CAPTokenStatefulTest is Test {
 		vm.assume(amount > 1000 && amount <= token.balanceOf(alice) / 20);
 
 		// Set maximum taxes (within combined cap)
-		token.setTaxesImmediate(400, 400, 500); // 4% + 4% = 8% for sells, 5% for buys
+		token.proposeTaxChange(400, 400, 500); // 4% + 4% = 8% for sells, 5% for buys
+		vm.warp(block.timestamp + 24 hours);
+		token.applyTaxChange();
 
 		token.addPool(pool1);
 
@@ -485,7 +493,10 @@ contract CAPTokenStatefulTest is Test {
 		vm.prank(alice);
 		token.burn(amount / 4); // Burn
 
-		token.mint(carol, amount / 2); // Mint
+		// Mint with timelock
+		token.proposeMint(carol, amount / 2);
+		vm.warp(block.timestamp + 7 days);
+		token.executeMint();
 
 		// Verify final state is consistent
 		uint256 finalSupply = token.totalSupply();

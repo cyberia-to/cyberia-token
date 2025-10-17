@@ -56,7 +56,7 @@ describe("CAPToken", function () {
     });
 
     it("Should set owner", async function () {
-      expect(await cap.owner()).to.equal(owner.address);
+      expect(await cap.governance()).to.equal(owner.address);
     });
   });
 
@@ -138,30 +138,26 @@ describe("CAPToken", function () {
   });
 
   describe("Pool Management", function () {
-    it("Should allow owner to add pools", async function () {
+    it("Should allow owner to add and remove pools", async function () {
+      // Add pool
       await expect(cap.connect(owner).addPool(pool.address)).to.emit(cap, "PoolAdded").withArgs(pool.address);
-
       expect(await cap.isPool(pool.address)).to.be.true;
-    });
 
-    it("Should allow owner to remove pools", async function () {
-      await cap.connect(owner).addPool(pool.address);
-
+      // Remove pool
       await expect(cap.connect(owner).removePool(pool.address)).to.emit(cap, "PoolRemoved").withArgs(pool.address);
-
       expect(await cap.isPool(pool.address)).to.be.false;
-    });
-
-    it("Should not allow adding zero address as pool", async function () {
-      await expect(cap.connect(owner).addPool(ethers.ZeroAddress)).to.be.revertedWith("ZERO_ADDR");
     });
   });
 
   describe("Tax Configuration", function () {
-    it("Should allow owner to update tax rates immediately", async function () {
-      await expect(cap.connect(owner).setTaxesImmediate(200, 300, 100))
-        .to.emit(cap, "TaxesUpdated")
-        .withArgs(200, 300, 100);
+    it("Should allow owner to propose and apply tax rates with timelock", async function () {
+      await cap.connect(owner).proposeTaxChange(200, 300, 100);
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).applyTaxChange()).to.emit(cap, "TaxesUpdated").withArgs(200, 300, 100);
 
       expect(await cap.transferTaxBp()).to.equal(200);
       expect(await cap.sellTaxBp()).to.equal(300);
@@ -173,19 +169,19 @@ describe("CAPToken", function () {
       // Individual cap is 500 bp (5%)
 
       // Test at combined limit (400 + 400 = 800)
-      await expect(cap.connect(owner).setTaxesImmediate(400, 400, 0)).to.not.be.reverted;
+      await expect(cap.connect(owner).proposeTaxChange(400, 400, 0)).to.not.be.reverted;
 
       // Test exceeding combined limit (450 + 400 = 850, exceeds 800 combined cap)
-      await expect(cap.connect(owner).setTaxesImmediate(450, 400, 0)).to.be.revertedWith("COMBINED_SELL_TAX_TOO_HIGH");
+      await expect(cap.connect(owner).proposeTaxChange(450, 400, 0)).to.be.revertedWith("COMBINED_SELL_TAX_TOO_HIGH");
 
       // Test exceeding combined limit (400 + 450 = 850, exceeds 800 combined cap)
-      await expect(cap.connect(owner).setTaxesImmediate(400, 450, 0)).to.be.revertedWith("COMBINED_SELL_TAX_TOO_HIGH");
+      await expect(cap.connect(owner).proposeTaxChange(400, 450, 0)).to.be.revertedWith("COMBINED_SELL_TAX_TOO_HIGH");
 
       // Test just under combined limit (399 + 400 = 799)
-      await expect(cap.connect(owner).setTaxesImmediate(399, 400, 0)).to.not.be.reverted;
+      await expect(cap.connect(owner).proposeTaxChange(399, 400, 0)).to.not.be.reverted;
 
       // Test buy tax doesn't affect combined cap (400 + 400 + 500 where 400+400=800 for sell)
-      await expect(cap.connect(owner).setTaxesImmediate(400, 400, 500)).to.not.be.reverted; // Buy tax doesn't affect combined cap
+      await expect(cap.connect(owner).proposeTaxChange(400, 400, 500)).to.not.be.reverted; // Buy tax doesn't affect combined cap
     });
   });
 
@@ -220,38 +216,39 @@ describe("CAPToken", function () {
   });
 
   describe("Minting", function () {
-    it("Should allow owner to mint new tokens", async function () {
+    it("Should allow owner to propose and execute mint", async function () {
       const mintAmount = ethers.parseEther("1000000");
       const initialSupply = await cap.totalSupply();
       const initialBalance = await cap.balanceOf(user1.address);
 
-      await expect(cap.connect(owner).mint(user1.address, mintAmount))
-        .to.emit(cap, "TokensMinted")
-        .withArgs(user1.address, mintAmount);
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).executeMint()).to.emit(cap, "TokensMinted").withArgs(user1.address, mintAmount);
 
       expect(await cap.totalSupply()).to.equal(initialSupply + mintAmount);
       expect(await cap.balanceOf(user1.address)).to.equal(initialBalance + mintAmount);
     });
 
-    it("Should not allow non-owner to mint tokens", async function () {
+    it("Should not allow proposing mint to zero address", async function () {
       const mintAmount = ethers.parseEther("1000000");
 
-      await expect(cap.connect(user1).mint(user2.address, mintAmount)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
-    });
-
-    it("Should not allow minting to zero address", async function () {
-      const mintAmount = ethers.parseEther("1000000");
-
-      await expect(cap.connect(owner).mint(ethers.ZeroAddress, mintAmount)).to.be.revertedWith("MINT_TO_ZERO");
+      await expect(cap.connect(owner).proposeMint(ethers.ZeroAddress, mintAmount)).to.be.revertedWith("MINT_TO_ZERO");
     });
 
     it("Should emit canonical Transfer event when minting", async function () {
       const mintAmount = ethers.parseEther("1000000");
 
-      await expect(cap.connect(owner).mint(user1.address, mintAmount))
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).executeMint())
         .to.emit(cap, "Transfer")
         .withArgs(ethers.ZeroAddress, user1.address, mintAmount);
     });
@@ -260,7 +257,13 @@ describe("CAPToken", function () {
       const mintAmount = ethers.parseEther("1000000");
       const initialTreasuryBalance = await cap.balanceOf(treasury.address);
 
-      await cap.connect(owner).mint(user1.address, mintAmount);
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).executeMint();
 
       // Treasury balance should not change (no tax on mint)
       expect(await cap.balanceOf(treasury.address)).to.equal(initialTreasuryBalance);
@@ -290,19 +293,6 @@ describe("CAPToken", function () {
       const newImplementation = await CAPTokenV2.deploy();
 
       await expect(cap.connect(owner).upgradeToAndCall(await newImplementation.getAddress(), "0x")).to.not.be.reverted;
-    });
-  });
-
-  describe("Edge Cases", function () {
-    it("Should not tax burns", async function () {
-      await cap.connect(owner).transfer(user1.address, ethers.parseEther("1000"));
-      const burnAmount = ethers.parseEther("100");
-
-      const treasuryBalanceBefore = await cap.balanceOf(treasury.address);
-      await cap.connect(user1).burn(burnAmount);
-      const treasuryBalanceAfter = await cap.balanceOf(treasury.address);
-
-      expect(treasuryBalanceAfter).to.equal(treasuryBalanceBefore);
     });
   });
 

@@ -1,6 +1,7 @@
 import { ethers, upgrades, network } from "hardhat";
 import { getNetworkConfig, getDeploymentConfig, validateEnvironment } from "./config/environments";
 import { saveDeployment } from "./utils/deployment-tracker";
+import { runPostDeploymentUpdates } from "./utils/post-deployment";
 
 interface DeployConfig {
   owner: string;
@@ -91,19 +92,19 @@ async function verifyDeployment(address: string, config: DeployConfig) {
   const name = await contract.name();
   const symbol = await contract.symbol();
   const totalSupply = await contract.totalSupply();
-  const owner = await contract.owner();
+  const governance = await contract.governance();
   const feeRecipient = await contract.feeRecipient();
 
   console.log(`Token Name: ${name}`);
   console.log(`Token Symbol: ${symbol}`);
   console.log(`Total Supply: ${ethers.formatEther(totalSupply)} CAP`);
-  console.log(`Owner: ${owner}`);
+  console.log(`Governance: ${governance}`);
   console.log(`Fee Recipient: ${feeRecipient}`);
 
   // Validate deployment
   if (name !== "Cyberia") throw new Error("Invalid token name");
   if (symbol !== "CAP") throw new Error("Invalid token symbol");
-  if (owner !== config.owner) throw new Error("Owner mismatch");
+  if (governance !== config.owner) throw new Error("Governance mismatch");
   if (feeRecipient !== config.feeRecipient) throw new Error("Fee recipient mismatch");
 
   console.log("✅ Deployment verification passed!");
@@ -123,7 +124,7 @@ async function main() {
     await verifyDeployment(deployment.proxyAddress, config);
 
     // Save deployment record
-    saveDeployment(networkName, {
+    const deploymentRecord = {
       network: networkName,
       chainId: networkConfig.chainId,
       timestamp: new Date().toISOString(),
@@ -135,7 +136,12 @@ async function main() {
       txHash: deployment.txHash,
       blockNumber: deployment.blockNumber,
       verified: false,
-    });
+    };
+
+    saveDeployment(networkName, deploymentRecord);
+
+    // Run post-deployment updates (auto-update .env, README, etc.)
+    await runPostDeploymentUpdates(networkName, deploymentRecord);
 
     console.log("\n🎉 Deployment completed successfully!");
     console.log(`\n📝 Next steps:`);

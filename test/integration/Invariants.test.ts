@@ -68,14 +68,25 @@ describe("Invariant and Property-Based Tests", function () {
 
       expect(currentSupply).to.be.lte(maxSupply);
 
-      // Try to mint up to max
+      // Test that we cannot propose minting beyond MAX_SUPPLY
       const remainingSupply = maxSupply - currentSupply;
-      await cap.connect(owner).mint(user1.address, remainingSupply);
+      await expect(cap.connect(owner).proposeMint(user1.address, remainingSupply + 1n)).to.be.revertedWith(
+        "EXCEEDS_MAX_SUPPLY"
+      );
 
-      expect(await cap.totalSupply()).to.equal(maxSupply);
+      // Mint within rate limit (100M per 30 days)
+      const mintAmount = ethers.parseEther("50000000"); // 50M tokens
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
 
-      // Cannot mint more
-      await expect(cap.connect(owner).mint(user1.address, 1)).to.be.revertedWith("EXCEEDS_MAX_SUPPLY");
+      // Fast forward 7 days for mint timelock
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).executeMint();
+
+      const newSupply = await cap.totalSupply();
+      expect(newSupply).to.equal(currentSupply + mintAmount);
+      expect(newSupply).to.be.lte(maxSupply);
     });
 
     it("INVARIANT: Burning reduces total supply by exact amount", async function () {
@@ -91,7 +102,13 @@ describe("Invariant and Property-Based Tests", function () {
       const initialSupply = await cap.totalSupply();
       const mintAmount = ethers.parseEther("50000");
 
-      await cap.connect(owner).mint(user1.address, mintAmount);
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
+
+      // Fast forward 7 days for mint timelock
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).executeMint();
 
       expect(await cap.totalSupply()).to.equal(initialSupply + mintAmount);
     });
@@ -224,7 +241,10 @@ describe("Invariant and Property-Based Tests", function () {
 
     it("INVARIANT: Tax rate should never exceed configured maximum", async function () {
       // Set maximum allowed taxes (respecting combined cap of 800)
-      await cap.connect(owner).setTaxesImmediate(400, 400, 500); // 4% + 4% = 8% combined for sells, 5% for buys
+      await cap.connect(owner).proposeTaxChange(400, 400, 500); // 4% + 4% = 8% combined for sells, 5% for buys
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      await cap.connect(owner).applyTaxChange();
 
       const transferAmount = ethers.parseEther("10000");
 
@@ -375,10 +395,16 @@ describe("Invariant and Property-Based Tests", function () {
     it("PROPERTY: Idempotence - setting same tax rates multiple times has no effect", async function () {
       const taxRates = { transfer: 200, sell: 300, buy: 50 };
 
-      await cap.connect(owner).setTaxesImmediate(taxRates.transfer, taxRates.sell, taxRates.buy);
+      await cap.connect(owner).proposeTaxChange(taxRates.transfer, taxRates.sell, taxRates.buy);
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      await cap.connect(owner).applyTaxChange();
 
-      // Set same rates again
-      await cap.connect(owner).setTaxesImmediate(taxRates.transfer, taxRates.sell, taxRates.buy);
+      // Propose same rates again
+      await cap.connect(owner).proposeTaxChange(taxRates.transfer, taxRates.sell, taxRates.buy);
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      await cap.connect(owner).applyTaxChange();
 
       expect(await cap.transferTaxBp()).to.equal(taxRates.transfer);
       expect(await cap.sellTaxBp()).to.equal(taxRates.sell);
@@ -424,9 +450,15 @@ describe("Invariant and Property-Based Tests", function () {
     it("INVARIANT: Contract state should be consistent after any sequence of operations", async function () {
       // Perform random sequence of operations
       await cap.connect(user1).transfer(user2.address, ethers.parseEther("1000"));
-      await cap.connect(owner).setTaxesImmediate(200, 300, 100);
+      await cap.connect(owner).proposeTaxChange(200, 300, 100);
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      await cap.connect(owner).applyTaxChange();
       await cap.connect(user2).burn(ethers.parseEther("500"));
-      await cap.connect(owner).mint(user3.address, ethers.parseEther("10000"));
+      await cap.connect(owner).proposeMint(user3.address, ethers.parseEther("10000"));
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      await cap.connect(owner).executeMint();
       await cap.connect(user1).delegate(user2.address);
       await cap.connect(owner).addPool(pool.address);
       await cap.connect(user3).transfer(pool.address, ethers.parseEther("1000"));

@@ -246,10 +246,7 @@ describe("Timelock Boundary Tests", function () {
     it("Should prevent non-owner from cancelling", async function () {
       await cap.connect(owner).proposeTaxChange(200, 300, 50);
 
-      await expect(cap.connect(user1).cancelTaxChange()).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+      await expect(cap.connect(user1).cancelTaxChange()).to.be.revertedWith("ONLY_GOVERNANCE");
     });
 
     it("Should handle cancel-propose-cancel cycle", async function () {
@@ -270,23 +267,20 @@ describe("Timelock Boundary Tests", function () {
   });
 
   describe("Timelock Interaction with Other Operations", function () {
-    it("Should allow immediate tax changes during pending timelock", async function () {
-      // Propose timelock change
+    it("Should allow overwriting pending proposal with new proposal", async function () {
+      // Propose first timelock change
       await cap.connect(owner).proposeTaxChange(200, 300, 50);
 
-      // Owner can still use setTaxesImmediate
-      await cap.connect(owner).setTaxesImmediate(150, 250, 25);
+      // Owner can propose another change (overwrites first)
+      await cap.connect(owner).proposeTaxChange(150, 250, 25);
 
-      expect(await cap.transferTaxBp()).to.equal(150);
+      expect(await cap.pendingTransferTaxBp()).to.equal(150);
 
-      // Pending proposal is still there
-      expect(await cap.pendingTransferTaxBp()).to.equal(200);
-
-      // Can still apply pending proposal after timelock
+      // Can apply the new (overwritten) proposal after timelock
       await time.increase(TIMELOCK_DELAY + 1);
       await cap.connect(owner).applyTaxChange();
 
-      expect(await cap.transferTaxBp()).to.equal(200);
+      expect(await cap.transferTaxBp()).to.equal(150);
     });
 
     it("Should handle transfers during pending timelock", async function () {
@@ -319,19 +313,19 @@ describe("Timelock Boundary Tests", function () {
       expect(treasuryAfter2 - treasuryBefore2).to.equal(newTax);
     });
 
-    it("Should preserve pending proposal through ownership transfer", async function () {
+    it("Should preserve pending proposal through governance transfer", async function () {
       await cap.connect(owner).proposeTaxChange(200, 300, 50);
 
       const timestampBefore = await cap.taxChangeTimestamp();
 
-      // Transfer ownership
-      await cap.connect(owner).transferOwnership(user1.address);
+      // Transfer governance to user1
+      await cap.connect(owner).setGovernance(user1.address);
 
       // Pending proposal should still exist
       expect(await cap.taxChangeTimestamp()).to.equal(timestampBefore);
       expect(await cap.pendingTransferTaxBp()).to.equal(200);
 
-      // New owner can apply it
+      // New governance can apply it
       await time.increase(TIMELOCK_DELAY + 1);
       await cap.connect(user1).applyTaxChange();
 
@@ -359,26 +353,18 @@ describe("Timelock Boundary Tests", function () {
       expect(receipt?.gasUsed).to.be.lt(100000);
     });
 
-    it("Should compare gas cost: immediate vs timelock", async function () {
-      // Immediate change
-      const tx1 = await cap.connect(owner).setTaxesImmediate(200, 300, 50);
-      const receipt1 = await tx1.wait();
-      const immediateGas = receipt1?.gasUsed || 0n;
-
+    it("Should measure gas cost of propose + apply cycle", async function () {
       // Timelock change (propose + apply)
-      const tx2 = await cap.connect(owner).proposeTaxChange(150, 250, 25);
-      const receipt2 = await tx2.wait();
+      const tx1 = await cap.connect(owner).proposeTaxChange(200, 300, 50);
+      const receipt1 = await tx1.wait();
       await time.increase(TIMELOCK_DELAY + 1);
-      const tx3 = await cap.connect(owner).applyTaxChange();
-      const receipt3 = await tx3.wait();
+      const tx2 = await cap.connect(owner).applyTaxChange();
+      const receipt2 = await tx2.wait();
 
-      const timelockGas = (receipt2?.gasUsed || 0n) + (receipt3?.gasUsed || 0n);
+      const totalGas = (receipt1?.gasUsed || 0n) + (receipt2?.gasUsed || 0n);
 
-      // Timelock should cost more (two transactions)
-      expect(timelockGas).to.be.gt(immediateGas);
-
-      // But not excessively more
-      expect(timelockGas).to.be.lt(immediateGas * 3n);
+      // Two-step process should be reasonable
+      expect(totalGas).to.be.lt(250000);
     });
   });
 });

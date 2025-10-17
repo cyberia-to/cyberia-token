@@ -238,16 +238,16 @@ contract CAPTokenAdvancedTest is Test {
 		assertEq(tokenV2.newVariable(), 42, "New variable should work");
 	}
 
-	/// @notice Test upgrade preserves ownership
-	function test_Upgrade_PreservesOwnership() public {
+	/// @notice Test upgrade preserves governance
+	function test_Upgrade_PreservesGovernance() public {
 		CAPTokenV2Mock implementationV2 = new CAPTokenV2Mock();
 
-		assertEq(token.owner(), owner, "Owner should be set before upgrade");
+		assertEq(token.governance(), owner, "Governance should be set before upgrade");
 
 		token.upgradeToAndCall(address(implementationV2), "");
 
 		CAPTokenV2Mock tokenV2 = CAPTokenV2Mock(address(proxy));
-		assertEq(tokenV2.owner(), owner, "Owner should be preserved after upgrade");
+		assertEq(tokenV2.governance(), owner, "Governance should be preserved after upgrade");
 	}
 
 	/// @notice Test only owner can upgrade
@@ -277,7 +277,9 @@ contract CAPTokenAdvancedTest is Test {
 		// Setup complex state
 		token.transfer(alice, 1000 ether);
 		token.transfer(bob, 2000 ether);
-		token.setTaxesImmediate(200, 300, 100);
+		token.proposeTaxChange(200, 300, 100);
+		vm.warp(block.timestamp + 24 hours);
+		token.applyTaxChange();
 		address pool = makeAddr("pool");
 		token.addPool(pool);
 

@@ -179,15 +179,17 @@ contract CAPTokenFuzzTest is Test {
 		vm.assume(buyTax <= MAX_TAX_BP);
 		vm.assume(transferTax + sellTax <= MAX_COMBINED_TAX_BP);
 
-		// Should not revert for valid tax rates
-		token.setTaxesImmediate(transferTax, sellTax, buyTax);
+		// Propose and apply tax changes with timelock
+		token.proposeTaxChange(transferTax, sellTax, buyTax);
+		vm.warp(block.timestamp + 24 hours);
+		token.applyTaxChange();
 
 		assertEq(token.transferTaxBp(), transferTax);
 		assertEq(token.sellTaxBp(), sellTax);
 		assertEq(token.buyTaxBp(), buyTax);
 	}
 
-	/// @notice Fuzz test: Invalid tax rates should revert
+	/// @notice Fuzz test: Invalid tax rates should revert on proposal
 	function testFuzz_InvalidTaxRatesRevert(uint256 transferTax, uint256 sellTax, uint256 buyTax) public {
 		vm.assume(
 			transferTax > MAX_TAX_BP ||
@@ -196,9 +198,9 @@ contract CAPTokenFuzzTest is Test {
 				(transferTax + sellTax > MAX_COMBINED_TAX_BP && transferTax <= MAX_TAX_BP && sellTax <= MAX_TAX_BP)
 		);
 
-		// Should revert for invalid tax rates
+		// Should revert when proposing invalid tax rates
 		vm.expectRevert();
-		token.setTaxesImmediate(transferTax, sellTax, buyTax);
+		token.proposeTaxChange(transferTax, sellTax, buyTax);
 	}
 
 	/*//////////////////////////////////////////////////////////////
@@ -265,21 +267,28 @@ contract CAPTokenFuzzTest is Test {
 		assertEq(totalSupplyAfter, totalSupplyBefore, "Total supply should remain constant");
 	}
 
-	/// @notice Fuzz test: Mint should respect max supply
+	/// @notice Fuzz test: Mint should respect max supply and rate limit
 	function testFuzz_MintRespectsMaxSupply(uint256 mintAmount) public {
 		uint256 currentSupply = token.totalSupply();
 		uint256 available = MAX_SUPPLY - currentSupply;
+		uint256 maxMintPerPeriod = 100_000_000 ether; // Rate limit
 
 		vm.assume(mintAmount > 0 && mintAmount < type(uint256).max - currentSupply); // Prevent overflow
 
-		if (mintAmount <= available) {
-			// Should succeed
-			token.mint(owner, mintAmount);
+		if (mintAmount <= available && mintAmount <= maxMintPerPeriod) {
+			// Should succeed with timelock
+			token.proposeMint(owner, mintAmount);
+			vm.warp(block.timestamp + 7 days);
+			token.executeMint();
 			assertEq(token.totalSupply(), currentSupply + mintAmount);
-		} else {
-			// Should revert
+		} else if (mintAmount > available) {
+			// Should revert when proposing (exceeds max supply)
 			vm.expectRevert("EXCEEDS_MAX_SUPPLY");
-			token.mint(owner, mintAmount);
+			token.proposeMint(owner, mintAmount);
+		} else if (mintAmount > maxMintPerPeriod) {
+			// Should revert when proposing (exceeds rate limit)
+			vm.expectRevert("EXCEEDS_MINT_CAP_PER_PERIOD");
+			token.proposeMint(owner, mintAmount);
 		}
 	}
 

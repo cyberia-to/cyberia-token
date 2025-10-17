@@ -2,15 +2,20 @@
 
 This guide shows how to integrate the CAP token with Aragon OSx for DAO governance.
 
+> **📋 Current Status (Sepolia):**
+> ✅ CAP Token deployed: `0xA6B680A88c16056de7194CF775D04A45D0692C11`
+> ⏳ Aragon DAO: Not deployed yet (use this guide for setup)
+> ⏳ Governance transfer: Pending DAO deployment
+
 ## Overview
 
 The CAP token implements ERC-20Votes (EIP-5805) making it fully compatible with Aragon OSx token-voting plugin and Snapshot.
 
 ## Prerequisites
 
-- Deployed CAP token contract
-- Aragon OSx DAO setup
-- Token-voting plugin installed
+- ✅ Deployed CAP token contract
+- ⏳ Aragon OSx DAO setup (follow this guide)
+- ⏳ Token-voting plugin installed (part of DAO setup)
 
 ## Step-by-Step Integration
 
@@ -87,33 +92,33 @@ const tokenVotingConfig = {
 };
 ```
 
-### 3. Transfer Token Ownership to DAO
+### 3. Transfer Token Governance to DAO
 
-Once the DAO is created, transfer CAP token ownership. The CAP token uses OpenZeppelin's `Ownable` which has a simple one-step transfer:
+Once the DAO is created, transfer CAP token governance control. The CAP token uses a custom `governance` address pattern:
 
 ```javascript
 // Option 1: Direct transfer from deployer (outside of governance)
 // Execute this from the deployer account immediately after DAO creation
 const capToken = await ethers.getContractAt("CAPToken", process.env.CAP_TOKEN_ADDRESS);
-await capToken.transferOwnership(DAO_ADDRESS);
+await capToken.setGovernance(DAO_ADDRESS);
 
-// Option 2: Create a governance proposal to transfer ownership
-// (Use this if ownership is currently held by another contract/DAO)
-const transferOwnershipAction = {
+// Option 2: Create a governance proposal to transfer governance
+// (Use this if governance is currently held by another contract/DAO)
+const setGovernanceAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData("transferOwnership", [DAO_ADDRESS]),
+  data: capTokenInterface.encodeFunctionData("setGovernance", [DAO_ADDRESS]),
 };
 
 // Create proposal in DAO
 const proposalParams = {
   pluginAddress: tokenVotingPluginAddress,
-  actions: [transferOwnershipAction],
+  actions: [setGovernanceAction],
   metadata: {
-    title: "Transfer CAP Token Ownership to DAO",
+    title: "Transfer CAP Token Governance to DAO",
     summary: "Transfer CAP token administrative control to the DAO",
     description:
-      "This proposal transfers ownership of the CAP token contract to this DAO, enabling governance-controlled administration of taxes, pools, upgrades, and minting.",
+      "This proposal transfers governance of the CAP token contract to this DAO, enabling governance-controlled administration of taxes, pools, upgrades, and minting.",
     resources: [],
   },
 };
@@ -121,7 +126,7 @@ const proposalParams = {
 const proposal = await client.methods.createProposal(proposalParams);
 ```
 
-**Important**: After transferring ownership to the DAO, all administrative functions (tax changes, pool management, upgrades, minting) will require governance proposals and voting.
+**Important**: After transferring governance to the DAO, all administrative functions (tax changes, pool management, upgrades, minting) will require governance proposals and voting.
 
 ### 4. Example Governance Proposals
 
@@ -164,16 +169,13 @@ const applyTaxChangeAction = {
   data: capTokenInterface.encodeFunctionData("applyTaxChange", []),
 };
 
-// Note: For emergency situations, use setTaxesImmediate() which bypasses the timelock
-// This should only be used in critical situations with strong DAO consensus
-const emergencyTaxAction = {
+// Note: Tax changes ALWAYS require 24-hour timelock for security
+// There is no emergency bypass function - plan ahead for tax adjustments
+// If you need to cancel a pending change, use cancelTaxChange()
+const cancelTaxChangeAction = {
   to: process.env.CAP_TOKEN_ADDRESS,
   value: 0,
-  data: capTokenInterface.encodeFunctionData("setTaxesImmediate", [
-    50, // 0.5% transfer tax
-    150, // 1.5% sell tax
-    0, // 0% buy tax
-  ]),
+  data: capTokenInterface.encodeFunctionData("cancelTaxChange", []),
 };
 ```
 

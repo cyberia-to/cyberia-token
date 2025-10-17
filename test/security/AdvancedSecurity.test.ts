@@ -68,7 +68,10 @@ describe("Advanced Security Tests", function () {
 
   describe("EIP-2612 Permit Functionality", function () {
     it("Should support full EIP-2612 permit signature flow", async function () {
-      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+      // Get current block timestamp from hardhat network
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock!.timestamp;
+      const deadline = currentTime + 3600; // 1 hour from current block time
       const value = ethers.parseEther("1000");
 
       // Get domain separator
@@ -146,7 +149,10 @@ describe("Advanced Security Tests", function () {
     });
 
     it("Should reject expired permit", async function () {
-      const expiredDeadline = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
+      // Get current block timestamp from hardhat network
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const currentTime = currentBlock!.timestamp;
+      const expiredDeadline = currentTime - 3600; // 1 hour ago from current block time
       const value = ethers.parseEther("1000");
 
       const domain = {
@@ -187,7 +193,13 @@ describe("Advanced Security Tests", function () {
     it("Should preserve storage layout after upgrade", async function () {
       // Set up initial state
       await cap.connect(owner).addPool(user1.address);
-      await cap.connect(owner).setTaxesImmediate(200, 300, 100);
+      await cap.connect(owner).proposeTaxChange(200, 300, 100);
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).applyTaxChange();
       await cap.connect(owner).transfer(user2.address, ethers.parseEther("1000"));
 
       // Record all state
@@ -196,7 +208,7 @@ describe("Advanced Security Tests", function () {
         symbol: await cap.symbol(),
         totalSupply: await cap.totalSupply(),
         decimals: await cap.decimals(),
-        owner: await cap.owner(),
+        owner: await cap.governance(),
         feeRecipient: await cap.feeRecipient(),
         transferTaxBp: await cap.transferTaxBp(),
         sellTaxBp: await cap.sellTaxBp(),
@@ -218,7 +230,7 @@ describe("Advanced Security Tests", function () {
       expect(await cap.symbol()).to.equal(stateBefore.symbol);
       expect(await cap.totalSupply()).to.equal(stateBefore.totalSupply);
       expect(await cap.decimals()).to.equal(stateBefore.decimals);
-      expect(await cap.owner()).to.equal(stateBefore.owner);
+      expect(await cap.governance()).to.equal(stateBefore.owner);
       expect(await cap.feeRecipient()).to.equal(stateBefore.feeRecipient);
       expect(await cap.transferTaxBp()).to.equal(stateBefore.transferTaxBp);
       expect(await cap.sellTaxBp()).to.equal(stateBefore.sellTaxBp);
@@ -265,7 +277,13 @@ describe("Advanced Security Tests", function () {
       await cap.connect(owner).addPool(user1.address);
       await cap.connect(owner).addPool(user2.address);
       await cap.connect(owner).setFeeRecipient(attacker.address);
-      await cap.connect(owner).setTaxesImmediate(150, 200, 50);
+      await cap.connect(owner).proposeTaxChange(150, 200, 50);
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).applyTaxChange();
 
       // Perform transfers
       await cap.connect(owner).transfer(user1.address, ethers.parseEther("500"));
@@ -289,50 +307,76 @@ describe("Advanced Security Tests", function () {
     it("Should enforce max supply cap on minting", async function () {
       const maxSupply = await cap.MAX_SUPPLY();
       const currentSupply = await cap.totalSupply();
-      const available = maxSupply - currentSupply;
 
-      // Should succeed: mint exactly to cap
-      await expect(cap.connect(owner).mint(user1.address, available)).to.not.be.reverted;
+      // Calculate available supply within rate limit (100M per 30 days)
+      const rateLimitCap = ethers.parseEther("100000000");
+      const mintAmount = rateLimitCap < maxSupply - currentSupply ? rateLimitCap : maxSupply - currentSupply;
 
-      // Should fail: mint even 1 wei over cap
-      await expect(cap.connect(owner).mint(user1.address, 1)).to.be.revertedWith("EXCEEDS_MAX_SUPPLY");
+      // Should succeed: mint within rate limit and supply cap
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).executeMint()).to.not.be.reverted;
+
+      // Should fail: try to mint over rate limit
+      await expect(cap.connect(owner).proposeMint(user1.address, 1)).to.be.revertedWith("EXCEEDS_MINT_CAP_PER_PERIOD");
     });
 
     it("Should handle minting close to max supply", async function () {
-      const maxSupply = await cap.MAX_SUPPLY();
-      const currentSupply = await cap.totalSupply();
+      const _maxSupply = await cap.MAX_SUPPLY();
+      const _currentSupply = await cap.totalSupply();
+      const _rateLimitCap = ethers.parseEther("100000000");
 
-      // Mint most of available supply
-      const mintAmount = maxSupply - currentSupply - ethers.parseEther("100");
-      await cap.connect(owner).mint(user1.address, mintAmount);
+      // Mint within rate limit
+      const mintAmount = ethers.parseEther("50000000"); // 50M
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
 
-      // Should still be able to mint remaining
-      await expect(cap.connect(owner).mint(user2.address, ethers.parseEther("100"))).to.not.be.reverted;
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
 
-      // Now at cap
-      expect(await cap.totalSupply()).to.equal(maxSupply);
+      await cap.connect(owner).executeMint();
 
-      // Cannot mint more
-      await expect(cap.connect(owner).mint(user1.address, 1)).to.be.revertedWith("EXCEEDS_MAX_SUPPLY");
+      // Should still be able to mint remaining (within rate limit)
+      const remaining = ethers.parseEther("50000000"); // Another 50M
+      await cap.connect(owner).proposeMint(user2.address, remaining);
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).executeMint()).to.not.be.reverted;
+
+      // Now at rate limit for this period
+      await expect(cap.connect(owner).proposeMint(user1.address, 1)).to.be.revertedWith("EXCEEDS_MINT_CAP_PER_PERIOD");
     });
 
     it("Should allow minting after burning brings supply below cap", async function () {
-      const maxSupply = await cap.MAX_SUPPLY();
-      const currentSupply = await cap.totalSupply();
+      const mintAmount = ethers.parseEther("50000000"); // 50M
 
-      // Mint to cap
-      await cap.connect(owner).mint(user1.address, maxSupply - currentSupply);
+      // Mint within rate limit
+      await cap.connect(owner).proposeMint(user1.address, mintAmount);
 
-      // Cannot mint more
-      await expect(cap.connect(owner).mint(user1.address, ethers.parseEther("1"))).to.be.revertedWith(
-        "EXCEEDS_MAX_SUPPLY"
-      );
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(owner).executeMint();
 
       // Burn some tokens
       await cap.connect(user1).burn(ethers.parseEther("1000"));
 
-      // Now can mint again
-      await expect(cap.connect(owner).mint(user2.address, ethers.parseEther("500"))).to.not.be.reverted;
+      // Mint more (within rate limit)
+      await cap.connect(owner).proposeMint(user2.address, ethers.parseEther("10000000"));
+
+      // Fast forward 7 days
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(cap.connect(owner).executeMint()).to.not.be.reverted;
     });
   });
 });

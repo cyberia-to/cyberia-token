@@ -16,45 +16,40 @@ describe("DAO Integration Tests", function () {
   beforeEach(async function () {
     [owner, dao, treasury, user1, user2, pool1, pool2] = await ethers.getSigners();
 
-    // Deploy CAP Token
+    // Deploy CAP Token with owner initially getting all tokens
     const CAP = await ethers.getContractFactory("CAPToken");
     cap = (await upgrades.deployProxy(CAP, [owner.address, treasury.address], {
       kind: "uups",
       initializer: "initialize",
     })) as unknown as CAPToken;
+
+    // Give DAO some tokens before transferring governance
+    await cap.connect(owner).transfer(dao.address, ethers.parseEther("500000000"));
+
+    // Transfer governance to DAO
+    await cap.connect(owner).setGovernance(dao.address);
   });
 
-  describe("DAO Ownership Transfer", function () {
-    it("Should allow ownership transfer to DAO", async function () {
-      // Transfer ownership to DAO
-      await cap.connect(owner).transferOwnership(dao.address);
-
-      expect(await cap.owner()).to.equal(dao.address);
+  describe("DAO Governance Transfer", function () {
+    it("Should have DAO as governance after initial setup", async function () {
+      // DAO should be governance (set in beforeEach)
+      expect(await cap.governance()).to.equal(dao.address);
     });
 
-    it("Should prevent non-DAO from admin functions after transfer", async function () {
-      // Transfer ownership to DAO
-      await cap.connect(owner).transferOwnership(dao.address);
-
-      // Original owner should no longer have admin access
-      await expect(cap.connect(owner).setTaxesImmediate(200, 200, 0)).to.be.revertedWithCustomError(
-        cap,
-        "OwnableUnauthorizedAccount"
-      );
+    it("Should prevent non-DAO from admin functions", async function () {
+      // Users should not have admin access
+      await expect(cap.connect(user1).proposeTaxChange(200, 200, 0)).to.be.revertedWith("ONLY_GOVERNANCE");
 
       // DAO should have admin access
-      await expect(cap.connect(dao).setTaxesImmediate(200, 200, 0)).to.not.be.reverted;
+      await expect(cap.connect(dao).proposeTaxChange(200, 200, 0)).to.not.be.reverted;
     });
   });
 
   describe("Treasury Management", function () {
     beforeEach(async function () {
-      // Distribute tokens before transferring ownership
-      await cap.connect(owner).transfer(user1.address, ethers.parseEther("100000"));
-      await cap.connect(owner).transfer(user2.address, ethers.parseEther("100000"));
-
-      // Transfer ownership to DAO
-      await cap.connect(owner).transferOwnership(dao.address);
+      // Distribute tokens (DAO already has governance from main beforeEach)
+      await cap.connect(dao).transfer(user1.address, ethers.parseEther("100000"));
+      await cap.connect(dao).transfer(user2.address, ethers.parseEther("100000"));
     });
 
     it("Should allow DAO to update treasury address", async function () {
@@ -94,67 +89,43 @@ describe("DAO Integration Tests", function () {
   });
 
   describe("Tax Policy Management", function () {
-    beforeEach(async function () {
-      await cap.connect(owner).transferOwnership(dao.address);
-    });
+    // DAO already has governance from main beforeEach
 
-    it("Should allow DAO to implement progressive tax policy", async function () {
-      // Simulate DAO proposal to increase sell tax, decrease transfer tax
-      await cap.connect(dao).setTaxesImmediate(50, 200, 0); // 0.5% transfer, 2% sell, 0% buy
+    it("Should allow DAO to propose and apply tax changes with timelock", async function () {
+      await cap.connect(dao).proposeTaxChange(50, 200, 0);
+
+      // Taxes should not change immediately
+      expect(await cap.transferTaxBp()).to.equal(100);
+      expect(await cap.sellTaxBp()).to.equal(100);
+
+      // Fast forward 24 hours
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+
+      await cap.connect(dao).applyTaxChange();
 
       expect(await cap.transferTaxBp()).to.equal(50);
       expect(await cap.sellTaxBp()).to.equal(200);
       expect(await cap.buyTaxBp()).to.equal(0);
     });
 
-    it("Should allow DAO to temporarily disable taxes", async function () {
-      // DAO already owns the contract from beforeEach
-      // Give tokens to DAO
-      await cap.connect(owner).transfer(dao.address, ethers.parseEther("20000"));
-
-      // Emergency scenario: disable all taxes
-      await cap.connect(dao).setTaxesImmediate(0, 0, 0);
-
-      // Distribute tokens
-      await cap.connect(dao).transfer(user1.address, ethers.parseEther("10000"));
-
-      const transferAmount = ethers.parseEther("1000");
-      const user1InitialBalance = await cap.balanceOf(user1.address);
-      const user2InitialBalance = await cap.balanceOf(user2.address);
-
-      await cap.connect(user1).transfer(user2.address, transferAmount);
-
-      // No taxes should be applied
-      expect(await cap.balanceOf(user1.address)).to.equal(user1InitialBalance - transferAmount);
-      expect(await cap.balanceOf(user2.address)).to.equal(user2InitialBalance + transferAmount);
-    });
-
     it("Should respect tax caps even for DAO", async function () {
-      // DAO cannot set taxes above 5%
-      await expect(cap.connect(dao).setTaxesImmediate(501, 100, 100)).to.be.revertedWith("TRANSFER_TAX_TOO_HIGH");
-
-      await expect(cap.connect(dao).setTaxesImmediate(100, 501, 100)).to.be.revertedWith("SELL_TAX_TOO_HIGH");
-
-      await expect(cap.connect(dao).setTaxesImmediate(100, 100, 501)).to.be.revertedWith("BUY_TAX_TOO_HIGH");
+      await expect(cap.connect(dao).proposeTaxChange(501, 100, 100)).to.be.revertedWith("TRANSFER_TAX_TOO_HIGH");
+      await expect(cap.connect(dao).proposeTaxChange(100, 501, 100)).to.be.revertedWith("SELL_TAX_TOO_HIGH");
+      await expect(cap.connect(dao).proposeTaxChange(100, 100, 501)).to.be.revertedWith("BUY_TAX_TOO_HIGH");
     });
   });
 
   describe("AMM Pool Governance", function () {
-    beforeEach(async function () {
-      // Give tokens to DAO first
-      await cap.connect(owner).transfer(dao.address, ethers.parseEther("50000"));
-      await cap.connect(owner).transferOwnership(dao.address);
-    });
+    // DAO already has governance from main beforeEach
 
     it("Should allow DAO to manage AMM pools", async function () {
-      // Add multiple pools
       await cap.connect(dao).addPool(pool1.address);
       await cap.connect(dao).addPool(pool2.address);
 
       expect(await cap.isPool(pool1.address)).to.be.true;
       expect(await cap.isPool(pool2.address)).to.be.true;
 
-      // Remove a pool
       await cap.connect(dao).removePool(pool1.address);
 
       expect(await cap.isPool(pool1.address)).to.be.false;
@@ -163,39 +134,27 @@ describe("DAO Integration Tests", function () {
 
     it("Should apply correct taxes based on pool status", async function () {
       await cap.connect(dao).addPool(pool1.address);
-
-      // Give tokens to test accounts
       await cap.connect(dao).transfer(user1.address, ethers.parseEther("10000"));
       await cap.connect(dao).transfer(pool1.address, ethers.parseEther("10000"));
 
       const transferAmount = ethers.parseEther("1000");
+      const treasuryBefore = await cap.balanceOf(treasury.address);
 
-      // Test sell to pool (should have transfer + sell tax)
-      const user1InitialBalance = await cap.balanceOf(user1.address);
-      const treasuryInitialBalance = await cap.balanceOf(treasury.address);
-
+      // Sell to pool: transfer + sell tax = 2%
       await cap.connect(user1).transfer(pool1.address, transferAmount);
+      const treasuryAfter1 = await cap.balanceOf(treasury.address);
+      expect(treasuryAfter1 - treasuryBefore).to.equal((transferAmount * 200n) / 10000n);
 
-      const totalTax = (transferAmount * 200n) / 10000n; // 2% (1% transfer + 1% sell)
-      const _expectedNet = transferAmount - totalTax;
-
-      expect(await cap.balanceOf(user1.address)).to.equal(user1InitialBalance - transferAmount);
-      expect(await cap.balanceOf(treasury.address)).to.equal(treasuryInitialBalance + totalTax);
-
-      // Test buy from pool (should have no tax)
-      const user2InitialBalance = await cap.balanceOf(user2.address);
-
+      // Buy from pool: 0% tax
+      const user2Before = await cap.balanceOf(user2.address);
       await cap.connect(pool1).transfer(user2.address, transferAmount);
-
-      expect(await cap.balanceOf(user2.address)).to.equal(user2InitialBalance + transferAmount);
+      expect(await cap.balanceOf(user2.address)).to.equal(user2Before + transferAmount);
     });
   });
 
   describe("Governance Token Features", function () {
     beforeEach(async function () {
-      // Give tokens to DAO first
-      await cap.connect(owner).transfer(dao.address, ethers.parseEther("100000"));
-      await cap.connect(owner).transferOwnership(dao.address);
+      // DAO already has governance and tokens from main beforeEach
       await cap.connect(dao).transfer(user1.address, ethers.parseEther("50000"));
       await cap.connect(dao).transfer(user2.address, ethers.parseEther("30000"));
     });
@@ -258,15 +217,16 @@ describe("DAO Integration Tests", function () {
 
   describe("Complete DAO Workflow", function () {
     it("Should simulate complete DAO governance cycle", async function () {
-      // Step 1: Give tokens to DAO and transfer ownership
-      await cap.connect(owner).transfer(dao.address, ethers.parseEther("100000"));
-      await cap.connect(owner).transferOwnership(dao.address);
+      // DAO already has governance from main beforeEach
 
       // Step 2: DAO adds AMM pool
       await cap.connect(dao).addPool(pool1.address);
 
-      // Step 3: DAO adjusts tax policy
-      await cap.connect(dao).setTaxesImmediate(75, 150, 25); // 0.75%, 1.5%, 0.25%
+      // Step 3: DAO adjusts tax policy (propose and apply with timelock)
+      await cap.connect(dao).proposeTaxChange(75, 150, 25); // 0.75%, 1.5%, 0.25%
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      await cap.connect(dao).applyTaxChange();
 
       // Step 4: DAO updates treasury
       await cap.connect(dao).setFeeRecipient(treasury.address);
