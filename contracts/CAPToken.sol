@@ -23,6 +23,7 @@ contract CAPToken is
 	uint256 public constant BASIS_POINTS_DENOMINATOR = 10_000; // 100% = 10000 bp
 	uint256 public constant MAX_TAX_BP = 500; // 5% per individual tax
 	uint256 public constant MAX_COMBINED_TAX_BP = 800; // 8% combined cap for sell scenario (transfer + sell)
+	uint256 public constant MAX_TOTAL_TAX_BP = 1000; // 10% global cap for any combination of all three taxes
 	uint256 public constant INITIAL_SUPPLY = 1_000_000_000 ether; // 1e9 * 1e18
 	uint256 public constant MAX_SUPPLY = 10_000_000_000 ether; // 10B max supply cap (10x initial)
 	uint256 public constant TAX_CHANGE_DELAY = 24 hours; // Timelock delay for tax changes
@@ -128,6 +129,10 @@ contract CAPToken is
 		// Combined cap: prevent total tax burden on sells from exceeding MAX_COMBINED_TAX_BP
 		// Sells incur both transferTaxBp and sellTaxBp, so their sum must be capped
 		require(_transferTaxBp + _sellTaxBp <= MAX_COMBINED_TAX_BP, "COMBINED_SELL_TAX_TOO_HIGH");
+		// Global cap: prevent any single tax or combination from being too high
+		// This ensures transfer+buy and other combinations are also bounded
+		require(_transferTaxBp + _buyTaxBp <= MAX_TOTAL_TAX_BP, "TOTAL_TAX_TOO_HIGH");
+		require(_sellTaxBp + _buyTaxBp <= MAX_TOTAL_TAX_BP, "TOTAL_TAX_TOO_HIGH");
 
 		pendingTransferTaxBp = _transferTaxBp;
 		pendingSellTaxBp = _sellTaxBp;

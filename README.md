@@ -14,6 +14,27 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 - **Bridging Ready**: Governance-gated minting (max 10B supply) for future OFT/LayerZero bridging
 - **DAO Governance**: Aragon OSx integration with token-voting plugin
 
+## Future Omnichain Bridging (OFT)
+
+**Current Status**: A stub adapter contract (`OFTAdapterStub.sol`) exists as a placeholder for future LayerZero OFT integration.
+
+**Integration Strategy**:
+
+- The current CAP token is **not yet integrated** with the OFT adapter
+- Future LayerZero OFT integration will require a **contract upgrade** to add bridging hooks
+- The upgrade will add a configurable adapter address that the token can call during cross-chain operations
+- Tax and governance logic will remain unchanged during the upgrade
+- Minting for bridging purposes is already supported via the governance-controlled `proposeMint()` function
+
+**Why this approach**:
+
+- Allows thorough testing and auditing of core token functionality first
+- Keeps the initial deployment simple and focused
+- Enables flexibility in choosing the final bridging solution (LayerZero V2, Axelar, or others)
+- Preserves all existing token balances, voting power, and governance during the upgrade
+
+**Timeline**: OFT integration planned after mainnet deployment and initial liquidity establishment.
+
 ## Deployed Contracts
 
 ### Sepolia Testnet
@@ -82,20 +103,36 @@ npm run verify:sepolia       # Verify on Etherscan
 
 ## Tax System
 
-| Type          | From → To   | Default Rate               | Notes                            |
-| ------------- | ----------- | -------------------------- | -------------------------------- |
-| Transfer      | User → User | 1%                         | Standard peer-to-peer            |
-| Sell          | User → Pool | 2% (1% transfer + 1% sell) | AMM sell                         |
-| Buy           | Pool → User | 0%                         | AMM buy (default)                |
-| Pool Transfer | Pool → Pool | 0%                         | Tax-free for liquidity migration |
+The token implements a hybrid tax system with three independent tax parameters:
 
-### Tax Details
+| Tax Type         | Applied When           | Default Rate | Individual Cap |
+| ---------------- | ---------------------- | ------------ | -------------- |
+| **Transfer Tax** | User → User (non-pool) | 1% (100 bp)  | 5% (500 bp)    |
+| **Sell Tax**     | User → Pool (AMM sell) | 1% (100 bp)  | 5% (500 bp)    |
+| **Buy Tax**      | Pool → User (AMM buy)  | 0% (0 bp)    | 5% (500 bp)    |
 
-- Fees go to treasury or burn (if recipient = `0x0`)
-- Max 5% per individual tax type
-- Max 8% combined (transfer + sell)
-- 24-hour timelock required for tax changes
-- Pool-to-pool transfers are tax-exempt to facilitate AMM operations
+### How Taxes Are Applied
+
+| Transaction Type    | From → To   | Taxes Applied                    | Total Tax (Default) |
+| ------------------- | ----------- | -------------------------------- | ------------------- |
+| Peer-to-peer        | User → User | Transfer tax only                | 1%                  |
+| AMM Sell            | User → Pool | Transfer tax + Sell tax (hybrid) | 2%                  |
+| AMM Buy             | Pool → User | Buy tax only                     | 0%                  |
+| Liquidity Migration | Pool → Pool | No taxes                         | 0%                  |
+
+### Tax Safety Limits
+
+- **Individual cap**: Each tax type limited to 5% (500 bp)
+- **Sell scenario cap**: Transfer + Sell ≤ 8% (800 bp)
+- **Global cap**: Any two taxes combined ≤ 10% (1000 bp)
+- **Timelock**: All tax changes require 24-hour delay (no emergency override)
+- **Pool exemption**: Pool-to-pool transfers always tax-free for AMM operations
+
+### Tax Distribution
+
+- Fees go to configurable `feeRecipient` address (treasury/Safe)
+- Setting `feeRecipient` to `0x0` enables burn mode (reduces supply)
+- Canonical ERC-20 burn events emitted for proper supply tracking
 
 ## Deployment
 
@@ -189,12 +226,15 @@ applyTaxChange()
 
 // Cancel pending tax change before it takes effect
 cancelTaxChange()
-
-// Emergency: Set taxes immediately (use with caution)
-setTaxesImmediate(uint256 transfer, uint256 sell, uint256 buy)
 ```
 
-**Tax Limits**: Max 500 bp (5%) each, combined transfer+sell ≤ 800 bp (8%)
+**Tax Limits**:
+
+- Individual: Max 500 bp (5%) per tax type
+- Sell scenario: transfer + sell ≤ 800 bp (8%)
+- Global: Any two taxes ≤ 1000 bp (10%)
+
+**Note**: All tax changes require a 24-hour timelock with no emergency override. This protects token holders from sudden tax increases.
 
 ### Other Admin Functions
 
