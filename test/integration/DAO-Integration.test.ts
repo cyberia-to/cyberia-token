@@ -1,20 +1,22 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { CAPToken } from "../../typechain-types";
+import { CAPToken, MockDEXPair } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("DAO Integration Tests", function () {
   let cap: CAPToken;
+  let mockPool1: MockDEXPair;
+  let mockPool2: MockDEXPair;
+  let pool1Address: string;
+  let pool2Address: string;
   let owner: HardhatEthersSigner;
   let dao: HardhatEthersSigner;
   let treasury: HardhatEthersSigner;
   let user1: HardhatEthersSigner;
   let user2: HardhatEthersSigner;
-  let pool1: HardhatEthersSigner;
-  let pool2: HardhatEthersSigner;
 
   beforeEach(async function () {
-    [owner, dao, treasury, user1, user2, pool1, pool2] = await ethers.getSigners();
+    [owner, dao, treasury, user1, user2] = await ethers.getSigners();
 
     // Deploy CAP Token with owner initially getting all tokens
     const CAP = await ethers.getContractFactory("CAPToken");
@@ -22,6 +24,14 @@ describe("DAO Integration Tests", function () {
       kind: "uups",
       initializer: "initialize",
     })) as unknown as CAPToken;
+
+    // Deploy Mock DEX Pairs for pool testing
+    const MockDEXPair = await ethers.getContractFactory("MockDEXPair");
+    const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+    mockPool1 = await MockDEXPair.deploy(await cap.getAddress(), WETH);
+    mockPool2 = await MockDEXPair.deploy(await cap.getAddress(), WETH);
+    pool1Address = await mockPool1.getAddress();
+    pool2Address = await mockPool2.getAddress();
 
     // Give DAO some tokens before transferring governance
     await cap.connect(owner).transfer(dao.address, ethers.parseEther("500000000"));
@@ -120,34 +130,38 @@ describe("DAO Integration Tests", function () {
     // DAO already has governance from main beforeEach
 
     it("Should allow DAO to manage AMM pools", async function () {
-      await cap.connect(dao).addPool(pool1.address);
-      await cap.connect(dao).addPool(pool2.address);
+      await cap.connect(dao).addPool(pool1Address);
+      await cap.connect(dao).addPool(pool2Address);
 
-      expect(await cap.isPool(pool1.address)).to.be.true;
-      expect(await cap.isPool(pool2.address)).to.be.true;
+      expect(await cap.isPool(pool1Address)).to.be.true;
+      expect(await cap.isPool(pool2Address)).to.be.true;
 
-      await cap.connect(dao).removePool(pool1.address);
+      await cap.connect(dao).removePool(pool1Address);
 
-      expect(await cap.isPool(pool1.address)).to.be.false;
-      expect(await cap.isPool(pool2.address)).to.be.true;
+      expect(await cap.isPool(pool1Address)).to.be.false;
+      expect(await cap.isPool(pool2Address)).to.be.true;
     });
 
     it("Should apply correct taxes based on pool status", async function () {
-      await cap.connect(dao).addPool(pool1.address);
+      await cap.connect(dao).addPool(pool1Address);
       await cap.connect(dao).transfer(user1.address, ethers.parseEther("10000"));
-      await cap.connect(dao).transfer(pool1.address, ethers.parseEther("10000"));
+      await cap.connect(dao).transfer(pool1Address, ethers.parseEther("10000"));
 
       const transferAmount = ethers.parseEther("1000");
       const treasuryBefore = await cap.balanceOf(treasury.address);
 
       // Sell to pool: transfer + sell tax = 2%
-      await cap.connect(user1).transfer(pool1.address, transferAmount);
+      await cap.connect(user1).transfer(pool1Address, transferAmount);
       const treasuryAfter1 = await cap.balanceOf(treasury.address);
       expect(treasuryAfter1 - treasuryBefore).to.equal((transferAmount * 200n) / 10000n);
 
-      // Buy from pool: 0% tax
+      // Buy from pool: 0% tax (impersonate pool contract)
+      await ethers.provider.send("hardhat_impersonateAccount", [pool1Address]);
+      await ethers.provider.send("hardhat_setBalance", [pool1Address, "0x1000000000000000000"]); // Give pool ETH for gas
+      const poolSigner = await ethers.getSigner(pool1Address);
       const user2Before = await cap.balanceOf(user2.address);
-      await cap.connect(pool1).transfer(user2.address, transferAmount);
+      await cap.connect(poolSigner).transfer(user2.address, transferAmount);
+      await ethers.provider.send("hardhat_stopImpersonatingAccount", [pool1Address]);
       expect(await cap.balanceOf(user2.address)).to.equal(user2Before + transferAmount);
     });
   });
@@ -220,7 +234,7 @@ describe("DAO Integration Tests", function () {
       // DAO already has governance from main beforeEach
 
       // Step 2: DAO adds AMM pool
-      await cap.connect(dao).addPool(pool1.address);
+      await cap.connect(dao).addPool(pool1Address);
 
       // Step 3: DAO adjusts tax policy (propose and apply with timelock)
       await cap.connect(dao).proposeTaxChange(75, 150, 25); // 0.75%, 1.5%, 0.25%
@@ -246,21 +260,25 @@ describe("DAO Integration Tests", function () {
       expect(treasuryAfter - treasuryBefore).to.equal(transferTax);
 
       // Test sell tax
-      await cap.connect(dao).transfer(pool1.address, ethers.parseEther("5000"));
+      await cap.connect(dao).transfer(pool1Address, ethers.parseEther("5000"));
 
       const sellTax = (transferAmount * (75n + 150n)) / 10000n; // 0.75% + 1.5%
 
       const treasuryBefore2 = await cap.balanceOf(treasury.address);
-      await cap.connect(user2).transfer(pool1.address, transferAmount);
+      await cap.connect(user2).transfer(pool1Address, transferAmount);
       const treasuryAfter2 = await cap.balanceOf(treasury.address);
 
       expect(treasuryAfter2 - treasuryBefore2).to.equal(sellTax);
 
-      // Test buy tax
+      // Test buy tax (impersonate pool contract)
       const buyTax = (transferAmount * 25n) / 10000n; // 0.25%
 
       const treasuryBefore3 = await cap.balanceOf(treasury.address);
-      await cap.connect(pool1).transfer(user1.address, transferAmount);
+      await ethers.provider.send("hardhat_impersonateAccount", [pool1Address]);
+      await ethers.provider.send("hardhat_setBalance", [pool1Address, "0x1000000000000000000"]); // Give pool ETH for gas
+      const poolSigner = await ethers.getSigner(pool1Address);
+      await cap.connect(poolSigner).transfer(user1.address, transferAmount);
+      await ethers.provider.send("hardhat_stopImpersonatingAccount", [pool1Address]);
       const treasuryAfter3 = await cap.balanceOf(treasury.address);
 
       expect(treasuryAfter3 - treasuryBefore3).to.equal(buyTax);

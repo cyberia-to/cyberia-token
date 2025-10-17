@@ -338,4 +338,15 @@ contract CAPToken is
 	function _maxSupply() internal pure override returns (uint256) {
 		return type(uint224).max; // use Votes default
 	}
+
+	/**
+	 * @dev Storage gap for future upgrades
+	 * This reserves storage slots for adding new state variables in future contract upgrades
+	 * without causing storage collisions. Current usage: 0/40 slots.
+	 *
+	 * IMPORTANT: When adding new state variables in upgrades:
+	 * 1. Add the variable BEFORE the gap
+	 * 2. Reduce gap size by the number of slots used (e.g., uint256[39] for 1 slot used)
+	 */
+	uint256[40] private __gap;
 }

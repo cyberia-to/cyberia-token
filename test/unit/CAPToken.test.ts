@@ -1,22 +1,22 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { CAPToken, OFTAdapterStub } from "../typechain-types";
+import { CAPToken, OFTAdapterStub, MockDEXPair } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("CAPToken", function () {
   let cap: CAPToken;
   let oftStub: OFTAdapterStub;
+  let mockPool: MockDEXPair;
   let owner: HardhatEthersSigner;
   let treasury: HardhatEthersSigner;
   let user1: HardhatEthersSigner;
   let user2: HardhatEthersSigner;
-  let pool: HardhatEthersSigner;
 
   const INITIAL_SUPPLY = ethers.parseEther("1000000000"); // 1B tokens
   const _BASIS_POINTS_DENOMINATOR = 10000;
 
   beforeEach(async function () {
-    [owner, treasury, user1, user2, pool] = await ethers.getSigners();
+    [owner, treasury, user1, user2] = await ethers.getSigners();
 
     // Deploy CAP Token
     const CAP = await ethers.getContractFactory("CAPToken");
@@ -31,6 +31,11 @@ describe("CAPToken", function () {
       kind: "uups",
       initializer: "initialize",
     })) as unknown as OFTAdapterStub;
+
+    // Deploy Mock DEX Pair for pool testing
+    const MockDEXPair = await ethers.getContractFactory("MockDEXPair");
+    const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; // Mainnet WETH
+    mockPool = await MockDEXPair.deploy(await cap.getAddress(), WETH);
   });
 
   describe("Deployment", function () {
@@ -85,7 +90,8 @@ describe("CAPToken", function () {
 
     it("Should apply sell tax when transferring to pool", async function () {
       // Add pool
-      await cap.connect(owner).addPool(pool.address);
+      const poolAddress = await mockPool.getAddress();
+      await cap.connect(owner).addPool(poolAddress);
 
       const transferAmount = ethers.parseEther("1000");
       const transferTax = (transferAmount * 100n) / 10000n; // 1% transfer tax
@@ -94,30 +100,38 @@ describe("CAPToken", function () {
       const expectedNet = transferAmount - totalTax;
 
       const user1InitialBalance = await cap.balanceOf(user1.address);
-      const poolInitialBalance = await cap.balanceOf(pool.address);
+      const poolInitialBalance = await cap.balanceOf(poolAddress);
       const treasuryInitialBalance = await cap.balanceOf(treasury.address);
 
-      await cap.connect(user1).transfer(pool.address, transferAmount);
+      await cap.connect(user1).transfer(poolAddress, transferAmount);
 
       expect(await cap.balanceOf(user1.address)).to.equal(user1InitialBalance - transferAmount);
-      expect(await cap.balanceOf(pool.address)).to.equal(poolInitialBalance + expectedNet);
+      expect(await cap.balanceOf(poolAddress)).to.equal(poolInitialBalance + expectedNet);
       expect(await cap.balanceOf(treasury.address)).to.equal(treasuryInitialBalance + totalTax);
     });
 
     it("Should apply no tax when transferring from pool (buy)", async function () {
       // Add pool and give it tokens
-      await cap.connect(owner).addPool(pool.address);
-      await cap.connect(owner).transfer(pool.address, ethers.parseEther("10000"));
+      const poolAddress = await mockPool.getAddress();
+      await cap.connect(owner).addPool(poolAddress);
+      await cap.connect(owner).transfer(poolAddress, ethers.parseEther("10000"));
 
       const transferAmount = ethers.parseEther("1000");
 
-      const poolInitialBalance = await cap.balanceOf(pool.address);
+      const poolInitialBalance = await cap.balanceOf(poolAddress);
       const user1InitialBalance = await cap.balanceOf(user1.address);
       const treasuryInitialBalance = await cap.balanceOf(treasury.address);
 
-      await cap.connect(pool).transfer(user1.address, transferAmount);
+      // Impersonate the pool contract to send tokens
+      await ethers.provider.send("hardhat_impersonateAccount", [poolAddress]);
+      await ethers.provider.send("hardhat_setBalance", [poolAddress, "0x1000000000000000000"]); // Give pool ETH for gas
+      const poolSigner = await ethers.getSigner(poolAddress);
 
-      expect(await cap.balanceOf(pool.address)).to.equal(poolInitialBalance - transferAmount);
+      await cap.connect(poolSigner).transfer(user1.address, transferAmount);
+
+      await ethers.provider.send("hardhat_stopImpersonatingAccount", [poolAddress]);
+
+      expect(await cap.balanceOf(poolAddress)).to.equal(poolInitialBalance - transferAmount);
       expect(await cap.balanceOf(user1.address)).to.equal(user1InitialBalance + transferAmount);
       expect(await cap.balanceOf(treasury.address)).to.equal(treasuryInitialBalance); // No change
     });
@@ -139,13 +153,15 @@ describe("CAPToken", function () {
 
   describe("Pool Management", function () {
     it("Should allow owner to add and remove pools", async function () {
+      const poolAddress = await mockPool.getAddress();
+
       // Add pool
-      await expect(cap.connect(owner).addPool(pool.address)).to.emit(cap, "PoolAdded").withArgs(pool.address);
-      expect(await cap.isPool(pool.address)).to.be.true;
+      await expect(cap.connect(owner).addPool(poolAddress)).to.emit(cap, "PoolAdded").withArgs(poolAddress);
+      expect(await cap.isPool(poolAddress)).to.be.true;
 
       // Remove pool
-      await expect(cap.connect(owner).removePool(pool.address)).to.emit(cap, "PoolRemoved").withArgs(pool.address);
-      expect(await cap.isPool(pool.address)).to.be.false;
+      await expect(cap.connect(owner).removePool(poolAddress)).to.emit(cap, "PoolRemoved").withArgs(poolAddress);
+      expect(await cap.isPool(poolAddress)).to.be.false;
     });
   });
 
