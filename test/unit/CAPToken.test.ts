@@ -1,11 +1,10 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { CAPToken, OFTAdapterStub, MockDEXPair } from "../typechain-types";
+import { CAPToken, MockDEXPair } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("CAPToken", function () {
   let cap: CAPToken;
-  let oftStub: OFTAdapterStub;
   let mockPool: MockDEXPair;
   let owner: HardhatEthersSigner;
   let treasury: HardhatEthersSigner;
@@ -24,13 +23,6 @@ describe("CAPToken", function () {
       kind: "uups",
       initializer: "initialize",
     })) as unknown as CAPToken;
-
-    // Deploy OFT Adapter Stub
-    const OFTStub = await ethers.getContractFactory("OFTAdapterStub");
-    oftStub = (await upgrades.deployProxy(OFTStub, [owner.address], {
-      kind: "uups",
-      initializer: "initialize",
-    })) as unknown as OFTAdapterStub;
 
     // Deploy Mock DEX Pair for pool testing
     const MockDEXPair = await ethers.getContractFactory("MockDEXPair");
@@ -309,16 +301,6 @@ describe("CAPToken", function () {
       const newImplementation = await CAPTokenV2.deploy();
 
       await expect(cap.connect(owner).upgradeToAndCall(await newImplementation.getAddress(), "0x")).to.not.be.reverted;
-    });
-  });
-
-  describe("OFT Adapter Stub", function () {
-    it("Should emit event when receiving OFT", async function () {
-      const testData = ethers.toUtf8Bytes("test data");
-
-      await expect(oftStub.onOFTReceived(user1.address, ethers.parseEther("1000"), testData))
-        .to.emit(oftStub, "OFTReceived")
-        .withArgs(user1.address, ethers.parseEther("1000"), testData);
     });
   });
 });

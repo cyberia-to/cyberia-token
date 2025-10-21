@@ -1,6 +1,6 @@
 # Cyberia (CAP) Token
 
-[![Tests](https://img.shields.io/badge/Tests-250%2F250%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
+[![Tests](https://img.shields.io/badge/Tests-297%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
 
 Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx DAO.
 
@@ -14,26 +14,52 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 - **Bridging Ready**: Governance-gated minting (max 10B supply) for future OFT/LayerZero bridging
 - **DAO Governance**: Aragon OSx integration with token-voting plugin
 
-## Future Omnichain Bridging (OFT)
+## Omnichain Bridging (LayerZero V2 OFT)
 
-**Current Status**: A stub adapter contract (`OFTAdapterStub.sol`) exists as a placeholder for future LayerZero OFT integration.
+**Status**: ✅ **Testnet Deployed** (Sepolia ↔ Arbitrum Sepolia)
 
-**Integration Strategy**:
+**Architecture**: Production-ready LayerZero V2 OFT integration with proper fee-on-transfer handling.
 
-- The current CAP token is **not yet integrated** with the OFT adapter
-- Future LayerZero OFT integration will require a **contract upgrade** to add bridging hooks
-- The upgrade will add a configurable adapter address that the token can call during cross-chain operations
-- Tax and governance logic will remain unchanged during the upgrade
-- Minting for bridging purposes is already supported via the governance-controlled `proposeMint()` function
+**Contracts**:
 
-**Why this approach**:
+- `CAPTokenOFTAdapter.sol` (211 lines) - Locks/unlocks CAP tokens on Ethereum mainnet
+- `CAPTokenOFT.sol` (104 lines) - Mints/burns on destination chains (Arbitrum, Optimism, Base, Polygon)
 
-- Allows thorough testing and auditing of core token functionality first
-- Keeps the initial deployment simple and focused
-- Enables flexibility in choosing the final bridging solution (LayerZero V2, Axelar, or others)
-- Preserves all existing token balances, voting power, and governance during the upgrade
+**Key Features**:
 
-**Timeline**: OFT integration planned after mainnet deployment and initial liquidity establishment.
+- ✅ Pre/post balance checks for fee-on-transfer compatibility
+- ✅ Supply invariant maintained across all chains (X locked = X minted)
+- ✅ Slippage protection with `minAmountLD` parameter
+- ✅ Official `@layerzerolabs/oft-evm` base contracts
+- ✅ Comprehensive NatSpec documentation
+- ✅ Full test coverage (297 passing tests: 191 Hardhat + 106 Foundry)
+
+**Bridge Fee**:
+
+- 💰 **1% fee per bridge operation** (transfer tax)
+- Fee applies to both bridging OUT (ETH → L2) and IN (L2 → ETH)
+- Revenue goes to DAO treasury
+- Intentional design to concentrate liquidity on mainnet
+
+**Supported Chains**:
+
+- Ethereum (mainnet/Sepolia) - OFTAdapter
+- Arbitrum (One/Sepolia) - OFT
+- Optimism (mainnet/Sepolia) - OFT
+- Base (mainnet/Sepolia) - OFT
+- Polygon (PoS/Amoy) - OFT
+
+**Testnet Deployments**:
+
+- ✅ Sepolia OFTAdapter: `0xf3d4e50Cb073d707d54Af96d157183e561212F4F`
+- ✅ Arbitrum Sepolia OFT: `0x073a66b4136A6b62AbAb0914D9540b1808D01526`
+
+**Next Steps**:
+
+1. ✅ Deploy to testnet (Sepolia ↔ Arbitrum Sepolia) - COMPLETE
+2. Test cross-chain bridging functionality
+3. Deploy to additional testnets (Optimism Sepolia, Base Sepolia)
+4. Security audit before mainnet deployment
 
 ## Deployed Contracts
 
@@ -43,6 +69,7 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 | ----------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **Token Proxy**         | `0xA6B680A88c16056de7194CF775D04A45D0692C11` | [Etherscan](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11)                                        |
 | **Implementation**      | `0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623` | [Etherscan](https://sepolia.etherscan.io/address/0xdE7a6EbD3A91E358e7F7FEa7AD5a641c7D6Bc623)                                        |
+| **OFT Adapter**         | `0xf3d4e50Cb073d707d54Af96d157183e561212F4F` | [Etherscan](https://sepolia.etherscan.io/address/0xf3d4e50Cb073d707d54Af96d157183e561212F4F) - LayerZero bridging                   |
 | **Governance**          | `0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0` | [Aragon DAO](https://app.aragon.org/dao/ethereum-sepolia/0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0) - Token governance transferred |
 | **Fee Recipient**       | `0x37Bb361F12D10F31a963033e1D0B3bb3026D6654` | Treasury wallet                                                                                                                     |
 | **Aragon DAO**          | `0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0` | [Aragon App](https://app.aragon.org/dao/ethereum-sepolia/0x9Ccc4Bc3A159F2f812B3790EcaabDa3051C70Ae0) - ✅ Active                    |
@@ -51,6 +78,14 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 | **AMM Pool**            | Not deployed yet                             | Pending setup                                                                                                                       |
 
 **Deployment**: October 17, 2025 | **TX**: [0x2ef3e...509ab](https://sepolia.etherscan.io/tx/0x2ef3ed1760d42d0fd73bcad5498ea43deb5db0b280fe08edc7c81778975509ab) | **Block**: 7393742
+
+### Arbitrum Sepolia Testnet
+
+| Component   | Address                                      | Link                                                                                                          |
+| ----------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **CAP OFT** | `0x073a66b4136A6b62AbAb0914D9540b1808D01526` | [Arbiscan](https://sepolia.arbiscan.io/address/0x073a66b4136A6b62AbAb0914D9540b1808D01526) - LayerZero bridge |
+
+**Deployment**: October 21, 2025 | **Status**: ✅ Verified | ⚠️ Not audited
 
 **Version**: v1.0.0 | **Status**: ✅ Verified | ✅ DAO Active | ⚠️ Not audited
 
@@ -84,7 +119,10 @@ cd cyberia-token
 npm install
 
 # Run tests
-npm test                     # Run all tests (250 passing: 144 Hardhat + 106 Foundry)
+npm test                     # Hardhat tests (191 passing)
+npm run test:foundry         # Foundry tests (106 passing)
+npm run test:all             # All tests (297 passing: 191 Hardhat + 106 Foundry)
+npm run test:ci              # Full CI validation (linters + all tests)
 npm run test:coverage        # Generate coverage report
 
 # Deploy to testnet
@@ -139,35 +177,66 @@ The token implements a hybrid tax system with three independent tax parameters:
 ### Environment Configuration
 
 ```bash
-# .env file
+# .env file - Core Configuration
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 PRIVATE_KEY=0x...
 ETHERSCAN_API_KEY=...
 SEPOLIA_OWNER_ADDRESS=0x...      # Initial governance address (deployer, then transfer to DAO)
 SEPOLIA_FEE_RECIPIENT=0x...      # Treasury address
+
+# LayerZero OFT Configuration (for cross-chain bridging)
+TESTNET_OWNER_ADDRESS=0x...      # Single owner address for all testnets (Sepolia, Arbitrum Sepolia, etc.)
+ARBITRUM_SEPOLIA_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
+# Network-specific addresses override TESTNET_OWNER_ADDRESS if needed
 ```
 
+**Note**: Use `TESTNET_OWNER_ADDRESS` to set the same owner across all testnet deployments. Network-specific variables (e.g., `ARBITRUM_SEPOLIA_OWNER_ADDRESS`) will override this if set.
+
 ### Deploy Commands
+
+#### CAP Token
 
 | Network | Command                  |
 | ------- | ------------------------ |
 | Sepolia | `npm run deploy:sepolia` |
 | Mainnet | `npm run deploy:mainnet` |
 
+#### LayerZero OFT (Cross-chain Bridging)
+
+| Command                       | Description                                            |
+| ----------------------------- | ------------------------------------------------------ |
+| `npm run oft:deploy:adapter`  | Deploy OFTAdapter on Ethereum/Sepolia                  |
+| `npm run oft:deploy:oft`      | Deploy OFT on destination chain (Arbitrum, Optimism)   |
+| `npm run oft:configure:peers` | Configure peer connections between chains              |
+| `npm run oft:check-balance`   | Check CAP token balance on destination chain           |
+| `npm run oft:check-peers`     | Verify peer configurations and detect stale settings   |
+| `npm run oft:test-bridge`     | Test bridging tokens cross-chain (requires deployment) |
+
 ### Post-Deployment
 
 ```bash
 npm run verify:sepolia           # Verify contract on Etherscan
 npm run configure:sepolia        # Configure pools and settings
+
+# For LayerZero deployments
+npm run oft:configure:peers      # Set up peer connections
+npm run oft:check-peers          # Verify configuration
 ```
 
 ## Testing
 
+### Combined Test Suites (Recommended)
+
+```bash
+npm run test:all            # Run all tests (297 passing: 191 Hardhat + 106 Foundry)
+npm run test:ci             # Full CI validation (linters + all tests)
+```
+
 ### Hardhat Tests
 
 ```bash
-npm test                    # All 144 comprehensive tests (6 pending)
+npm test                    # All Hardhat tests (191 passing)
 npm run test:unit           # Unit tests
 npm run test:security       # Security tests
 npm run test:integration    # Integration tests
@@ -178,7 +247,7 @@ npm run test:gas            # Gas usage report
 ### Foundry Tests (Fuzz & Invariant)
 
 ```bash
-npm run test:foundry              # All Foundry tests
+npm run test:foundry              # All Foundry tests (106 passing)
 npm run test:foundry:fuzz         # Fuzz testing
 npm run test:foundry:invariant    # Invariant testing
 npm run test:foundry:stateful     # Stateful testing
@@ -194,12 +263,12 @@ npm run validate:zodiac     # Validate Zodiac roles config
 
 ### Test Suite Breakdown
 
-#### Hardhat Tests (144 tests passing, 6 pending)
+#### Hardhat Tests (191 tests passing)
 
 - **Unit Tests** (60 tests): Core functionality, deployment, tax system, minting, burning, access control, checkpoints, edge cases
 - **Security Tests** (52 tests): Reentrancy protection, attack vectors, upgrade safety, permit signatures, timelock boundaries
 - **Integration Tests** (32 tests): DAO integration, Zodiac Safe integration, mainnet fork, invariants, delegation
-- **Pending Tests** (6 tests): Zodiac Safe integration scenarios requiring Safe deployment
+- **LayerZero Tests** (47 tests): OFTAdapter integration, fee-on-transfer handling, cross-chain supply invariants, peer configuration
 
 #### Foundry Tests (106 tests)
 
@@ -209,7 +278,7 @@ npm run validate:zodiac     # Validate Zodiac roles config
 - **Stateful Tests** (15 tests): Multi-step complex scenarios with state transitions
 - **Invariant Tests** (15 tests): Mathematical invariants under all conditions (128K calls per run)
 
-**Total Coverage**: 250 tests (144 Hardhat + 106 Foundry) ensuring comprehensive coverage of all contract functionality and security properties
+**Total Coverage**: 297 tests (191 Hardhat + 106 Foundry) ensuring comprehensive coverage of all contract functionality, cross-chain bridging, and security properties
 
 ## Contract Administration
 

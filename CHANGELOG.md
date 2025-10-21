@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-10-21
+
+### Added
+
+- LayerZero V2 OFT integration deployed to testnets
+  - Sepolia OFTAdapter: `0xf3d4e50Cb073d707d54Af96d157183e561212F4F`
+  - Arbitrum Sepolia OFT: `0x073a66b4136A6b62AbAb0914D9540b1808D01526`
+- Pre-deployment balance checks and gas estimation in deployment scripts
+- New utility scripts for LayerZero:
+  - `scripts/check-peers.ts` - Verify peer configurations and detect stale settings
+  - `scripts/check-oft-balance.ts` - Check CAP token balance on destination chains
+  - `scripts/layerzero/remove-stale-peer.ts` - Clean up incorrect peer configurations
+- New npm scripts for better workflow:
+  - `npm run test:all` - Run all tests (297 passing: 191 Hardhat + 106 Foundry)
+  - `npm run test:ci` - Full CI validation (linters + all tests)
+  - `npm run oft:check-balance` - Check OFT balance on destination chains
+  - `npm run oft:check-peers` - Verify peer configurations
+  - `npm run oft:test-bridge` - Test cross-chain bridging
+- TESTNET_OWNER_ADDRESS environment variable pattern to simplify testnet configuration
+- Network-specific faucet links in deployment error messages
+- Comprehensive deployment documentation:
+  - `DEPLOYMENT_ISSUES.md` - Detailed tracking of all deployment issues and fixes
+  - `DEPLOYMENT_FIXES_SUMMARY.md` - Summary of all fixes applied
+
+### Changed
+
+- Updated test count from 250 to 297 tests (added LayerZero integration tests)
+- Improved deployment scripts with balance validation and cost estimation
+- Enhanced error messages in deployment scripts with actionable guidance
+- Updated README.md to reflect testnet deployments and new scripts
+- Simplified testnet environment configuration with fallback pattern
+
+### Fixed
+
+- BigInt JSON serialization error in deploy-oft.ts (line 194)
+- Wrong Ethereum EID configuration (30101 mainnet vs 40161 Sepolia) in configure-oft-peers.ts
+- Missing balance checks before deployment attempts
+- All TypeScript linter errors (1,234 → 0 errors)
+- Unused variable warnings in test files
+- Stale peer configuration on Arbitrum Sepolia OFT
+
+### Deployed
+
+- **Sepolia OFTAdapter**: `0xf3d4e50Cb073d707d54Af96d157183e561212F4F` ✅ Verified
+- **Arbitrum Sepolia OFT**: `0x073a66b4136A6b62AbAb0914D9540b1808D01526` ✅ Verified
+
 ## [1.2.0] - 2025-10-17
 
 ### Added
@@ -164,6 +210,7 @@ Do NOT open public issues for security vulnerabilities.
 
 ---
 
-[Unreleased]: https://github.com/cyberia-to/cyberia-token/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/cyberia-to/cyberia-token/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/cyberia-to/cyberia-token/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/cyberia-to/cyberia-token/compare/v1.1.0...v1.2.0
 [1.0.0]: https://github.com/cyberia-to/cyberia-token/releases/tag/v1.0.0

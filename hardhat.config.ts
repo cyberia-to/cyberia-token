@@ -15,6 +15,22 @@ const MAINNET_RPC_URL = process.env.MAINNET_RPC_URL || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
+// LayerZero OFT destination chains
+const ARBITRUM_RPC_URL = process.env.ARBITRUM_RPC_URL || "";
+const ARBITRUM_SEPOLIA_RPC_URL = process.env.ARBITRUM_SEPOLIA_RPC_URL || "";
+const OPTIMISM_RPC_URL = process.env.OPTIMISM_RPC_URL || "";
+const OPTIMISM_SEPOLIA_RPC_URL = process.env.OPTIMISM_SEPOLIA_RPC_URL || "";
+const BASE_RPC_URL = process.env.BASE_RPC_URL || "";
+const BASE_SEPOLIA_RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || "";
+const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL || "";
+const POLYGON_AMOY_RPC_URL = process.env.POLYGON_AMOY_RPC_URL || "";
+
+// Block explorer API keys
+const ARBISCAN_API_KEY = process.env.ARBISCAN_API_KEY || "";
+const OPTIMISTIC_ETHERSCAN_API_KEY = process.env.OPTIMISTIC_ETHERSCAN_API_KEY || "";
+const BASESCAN_API_KEY = process.env.BASESCAN_API_KEY || "";
+const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "";
+
 // Gas reporter configuration
 const REPORT_GAS = process.env.REPORT_GAS === "true";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
@@ -89,11 +105,122 @@ const config: HardhatUserConfig = {
       gasPrice: "auto", // Let ethers.js determine optimal gas price
       timeout: 180000, // 3 minutes
     },
+
+    // LayerZero OFT Destination Chains - Mainnets
+    arbitrum: {
+      url: ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
+      chainId: 42161,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    optimism: {
+      url: OPTIMISM_RPC_URL || "https://mainnet.optimism.io",
+      chainId: 10,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    base: {
+      url: BASE_RPC_URL || "https://mainnet.base.org",
+      chainId: 8453,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    polygon: {
+      url: POLYGON_RPC_URL || "https://polygon-rpc.com",
+      chainId: 137,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    // LayerZero OFT Destination Chains - Testnets
+    arbitrumSepolia: {
+      url: ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc",
+      chainId: 421614,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    optimismSepolia: {
+      url: OPTIMISM_SEPOLIA_RPC_URL || "https://sepolia.optimism.io",
+      chainId: 11155420,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    baseSepolia: {
+      url: BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
+      chainId: 84532,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
+
+    polygonAmoy: {
+      url: POLYGON_AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      chainId: 80002,
+      accounts: PRIVATE_KEY && PRIVATE_KEY.length === 66 ? [PRIVATE_KEY] : [],
+      gasPrice: "auto",
+      timeout: 120000,
+    },
   },
 
   // Etherscan verification (V2 API)
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: {
+      mainnet: ETHERSCAN_API_KEY,
+      sepolia: ETHERSCAN_API_KEY,
+      arbitrumOne: ARBISCAN_API_KEY,
+      arbitrumSepolia: ARBISCAN_API_KEY,
+      optimisticEthereum: OPTIMISTIC_ETHERSCAN_API_KEY,
+      optimisticSepolia: OPTIMISTIC_ETHERSCAN_API_KEY,
+      base: BASESCAN_API_KEY,
+      baseSepolia: BASESCAN_API_KEY,
+      polygon: POLYGONSCAN_API_KEY,
+      polygonAmoy: POLYGONSCAN_API_KEY,
+    },
+    customChains: [
+      {
+        network: "arbitrumSepolia",
+        chainId: 421614,
+        urls: {
+          apiURL: "https://api-sepolia.arbiscan.io/api",
+          browserURL: "https://sepolia.arbiscan.io",
+        },
+      },
+      {
+        network: "optimisticSepolia",
+        chainId: 11155420,
+        urls: {
+          apiURL: "https://api-sepolia-optimistic.etherscan.io/api",
+          browserURL: "https://sepolia-optimism.etherscan.io",
+        },
+      },
+      {
+        network: "baseSepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org",
+        },
+      },
+      {
+        network: "polygonAmoy",
+        chainId: 80002,
+        urls: {
+          apiURL: "https://api-amoy.polygonscan.com/api",
+          browserURL: "https://amoy.polygonscan.com",
+        },
+      },
+    ],
   },
 
   // Gas reporter (useful for optimization)
@@ -139,7 +266,7 @@ const config: HardhatUserConfig = {
     runOnCompile: false,
     clear: true,
     flat: true,
-    only: [":CAPToken$"],
+    only: [":CAPToken$", ":CAPTokenOFTAdapter$", ":CAPTokenOFT$"],
     spacing: 2,
     format: "json",
   },
@@ -148,7 +275,7 @@ const config: HardhatUserConfig = {
   docgen: {
     outputDir: "./docs/api",
     pages: "single",
-    exclude: ["test", "OFTAdapterStub"],
+    exclude: ["test", "mocks"],
     theme: "markdown",
   },
 };
