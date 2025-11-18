@@ -1,12 +1,13 @@
 import { config as dotenvConfig } from "dotenv";
 dotenvConfig();
 
-import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 import "@typechain/hardhat";
+import "@nomicfoundation/hardhat-chai-matchers";
 import "hardhat-contract-sizer";
 import "hardhat-abi-exporter";
+import "solidity-coverage";
 import "solidity-docgen";
 import { HardhatUserConfig } from "hardhat/config";
 
