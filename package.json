@@ -74,7 +74,9 @@
     "oft:configure:peers": "hardhat run scripts/layerzero/configure-oft-peers.ts",
     "oft:check-balance": "hardhat run scripts/check-oft-balance.ts",
     "oft:check-peers": "hardhat run scripts/check-peers.ts",
-    "oft:test-bridge": "hardhat run scripts/layerzero/test-bridge.ts"
+    "oft:test-bridge": "hardhat run scripts/layerzero/test-bridge.ts",
+    "postinstall": "bash scripts/setup.sh",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20.0.0",

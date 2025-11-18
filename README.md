@@ -112,22 +112,36 @@ Not deployed yet. Production deployment requires security audit.
 
 ## Quick Start
 
+### For New Developers
+
 ```bash
 # Clone repository
 git clone --recurse-submodules https://github.com/cyberia-to/cyberia-token.git
 cd cyberia-token
 
-# Install dependencies
+# Install dependencies (automatically installs Foundry if missing)
 npm install
 
-# Run tests
+# Verify everything is set up correctly
+npm run test:ci              # Runs linters + all tests (306 passing)
+```
+
+**Note**: The `postinstall` script automatically installs [Foundry](https://getfoundry.sh/) if it's not already on your system. Pre-commit hooks will validate code quality and run all tests before allowing commits.
+
+### Running Tests
+
+```bash
+# Run all tests (recommended)
 npm test                     # Hardhat tests (200 passing)
 npm run test:foundry         # Foundry tests (106 passing)
 npm run test:all             # All tests (306 passing: 200 Hardhat + 106 Foundry)
 npm run test:ci              # Full CI validation (linters + all tests)
 npm run test:coverage        # Generate coverage report
+```
 
-# Deploy to testnet
+### Deploying to Testnet
+
+```bash
 cp .env.example .env         # Configure environment variables
 npm run deploy:sepolia       # Deploy to Sepolia
 npm run verify:sepolia       # Verify on Etherscan
@@ -385,6 +399,33 @@ npm run dao:info
 - **DAO_LARGE_OPS**: Large transfers (>200k CAP) require DAO vote
 - **DAO_TOKEN_ADMIN**: All admin functions (taxes, pools, upgrades) DAO-only
 
+## Development Workflow
+
+### Pre-Commit Hooks
+
+The project uses **Husky** to automatically enforce code quality standards before commits:
+
+```bash
+git add .
+git commit -m "Your message"
+
+# Automatically runs:
+# 1. ESLint + Prettier (TypeScript & Solidity)
+# 2. Hardhat tests (200 tests)
+# 3. Foundry tests (106 tests)
+# ✅ Commit succeeds only if all checks pass
+```
+
+### Foundry Installation
+
+Foundry is automatically installed during `npm install` via a postinstall script. If you need to manually install:
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+export PATH="$HOME/.foundry/bin:$PATH"
+foundryup
+```
+
 ## Architecture
 
 ```
@@ -406,19 +447,37 @@ Board Members
 
 ### Security Features
 
+**Access Control & Governance**:
+
+- ✅ All admin functions require DAO governance (Aragon OSx)
+- ✅ UUPS upgradeable pattern with timelock protection
+- ✅ Aragon integration for decentralized proposal voting
+
+**Transaction Safety**:
+
 - ✅ Reentrancy protection on all transfers
 - ✅ 24-hour timelock on tax changes (prevents front-running)
-- ✅ 30-day rolling window mint cap (100M per period) to prevent flash minting attacks
+- ✅ 30-day rolling window mint cap (100M per period) to prevent flash minting
+- ✅ Max supply cap (10B tokens)
+
+**Cross-Chain Security (LayerZero V2)**:
+
 - ✅ Fee recipient validation (prevents setting contract as recipient)
 - ✅ OFT burn functions restricted to LayerZero endpoint (prevents unauthorized burning)
-- ✅ Slippage protection on inbound transfers (default 5%, configurable by owner)
-- ✅ Max supply cap (10B tokens)
-- ✅ OpenZeppelin audited contracts
-- ✅ UUPS upgradeable pattern
+- ✅ Slippage protection on inbound transfers (default 5%, configurable)
+- ✅ Supply invariant maintained across all chains
+- ✅ Pre/post balance checks for fee-on-transfer compatibility
+
+**Code Quality**:
+
+- ✅ OpenZeppelin audited contract libraries
+- ✅ 306 automated tests (200 Hardhat + 106 Foundry fuzz/invariant)
+- ✅ Comprehensive NatSpec documentation
+- ✅ Solhint linting + Prettier formatting
 
 ### Security Status
 
-⚠️ **Not audited**. Professional security audit required before mainnet deployment.
+⚠️ **Not audited**. Professional security audit required before mainnet deployment. All testnet deployments are for development and testing only.
 
 ## License
 
