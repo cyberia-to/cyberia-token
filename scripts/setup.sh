@@ -2,8 +2,15 @@
 
 # Setup script for Cyberia Token project
 # Runs after npm install to ensure all dependencies (including Foundry) are installed
+# Skips Foundry installation in CI environments
 
 set -e
+
+# Skip setup in CI environments (GitHub Actions, GitLab CI, etc.)
+if [ ! -z "$CI" ] || [ ! -z "$GITHUB_ACTIONS" ] || [ ! -z "$GITLAB_CI" ]; then
+    echo "ℹ️  Skipping Foundry setup (CI environment detected)"
+    exit 0
+fi
 
 echo "🔧 Cyberia Token Setup"
 echo "====================="
