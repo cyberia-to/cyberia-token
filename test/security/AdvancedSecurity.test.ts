@@ -1,16 +1,16 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { CAPToken } from "../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Advanced Security Tests", function () {
   let cap: CAPToken;
-  let owner: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let attacker: HardhatEthersSigner;
-  let user1: HardhatEthersSigner;
-  let user2: HardhatEthersSigner;
+  let owner: Signer;
+  let treasury: Signer;
+  let attacker: Signer;
+  let user1: Signer;
+  let user2: Signer;
 
   beforeEach(async function () {
     [owner, treasury, attacker, user1, user2] = await ethers.getSigners();
@@ -22,8 +22,8 @@ describe("Advanced Security Tests", function () {
     })) as unknown as CAPToken;
 
     // Distribute tokens for testing
-    await cap.connect(owner).transfer(user1.address, ethers.parseEther("100000"));
-    await cap.connect(owner).transfer(attacker.address, ethers.parseEther("10000"));
+    await cap.connect(owner).transfer(user1.address, ethers.utils.parseEther("100000"));
+    await cap.connect(owner).transfer(attacker.address, ethers.utils.parseEther("10000"));
   });
 
   describe("Reentrancy Attack Simulation", function () {
@@ -31,7 +31,7 @@ describe("Advanced Security Tests", function () {
       // Note: ERC20 transfers don't have receiver hooks, but the nonReentrant modifier
       // protects against any potential reentrancy in the _update function
 
-      const transferAmount = ethers.parseEther("100");
+      const transferAmount = ethers.utils.parseEther("100");
       const user1BalanceBefore = await cap.balanceOf(user1.address);
 
       // Attempt transfer (should succeed without reentrancy)
@@ -40,7 +40,7 @@ describe("Advanced Security Tests", function () {
       const user1BalanceAfter = await cap.balanceOf(user1.address);
 
       // Verify balance changed exactly once
-      expect(user1BalanceBefore - user1BalanceAfter).to.equal(transferAmount);
+      expect(user1BalanceBefore.sub(user1BalanceAfter)).to.equal(transferAmount);
 
       // The nonReentrant modifier ensures that if any future upgrade adds
       // hooks or callbacks, reentrancy will still be prevented
@@ -48,7 +48,7 @@ describe("Advanced Security Tests", function () {
 
     it("Should handle nested transfer attempts safely", async function () {
       // Test that multiple transfers in sequence work correctly
-      const amount = ethers.parseEther("10");
+      const amount = ethers.utils.parseEther("10");
 
       // Start balance
       const startBalance = await cap.balanceOf(user1.address);
@@ -61,8 +61,8 @@ describe("Advanced Security Tests", function () {
       const endBalance = await cap.balanceOf(user1.address);
 
       // Should have transferred exactly 3x amount (plus taxes)
-      const expectedDeduction = amount * 3n;
-      expect(startBalance - endBalance).to.equal(expectedDeduction);
+      const expectedDeduction = amount.mul(3);
+      expect(startBalance.sub(endBalance)).to.equal(expectedDeduction);
     });
   });
 
@@ -72,14 +72,14 @@ describe("Advanced Security Tests", function () {
       const currentBlock = await ethers.provider.getBlock("latest");
       const currentTime = currentBlock!.timestamp;
       const deadline = currentTime + 3600; // 1 hour from current block time
-      const value = ethers.parseEther("1000");
+      const value = ethers.utils.parseEther("1000");
 
       // Get domain separator
       const domain = {
         name: await cap.name(),
         version: "1",
         chainId: (await ethers.provider.getNetwork()).chainId,
-        verifyingContract: await cap.getAddress(),
+        verifyingContract: cap.address,
       };
 
       // Define permit type
@@ -105,9 +105,9 @@ describe("Advanced Security Tests", function () {
         deadline: deadline,
       };
 
-      // Sign the permit
-      const signature = await user1.signTypedData(domain, types, message);
-      const { v, r, s } = ethers.Signature.from(signature);
+      // Sign the permit (ethers v5 uses _signTypedData)
+      const signature = await user1._signTypedData(domain, types, message);
+      const { v, r, s } = ethers.utils.splitSignature(signature);
 
       // Verify allowance is 0 before permit
       expect(await cap.allowance(user1.address, user2.address)).to.equal(0);
@@ -119,7 +119,7 @@ describe("Advanced Security Tests", function () {
       expect(await cap.allowance(user1.address, user2.address)).to.equal(value);
 
       // Verify nonce was incremented
-      expect(await cap.nonces(user1.address)).to.equal(nonce + 1n);
+      expect(await cap.nonces(user1.address)).to.equal(nonce.add(1));
 
       // User2 can now spend user1's tokens
       const user1BalanceBefore = await cap.balanceOf(user1.address);
@@ -128,16 +128,16 @@ describe("Advanced Security Tests", function () {
       await cap.connect(user2).transferFrom(user1.address, user2.address, value);
 
       // Verify transfer occurred with tax
-      const tax = (value * 100n) / 10000n; // 1%
-      const netAmount = value - tax;
+      const tax = value.mul(100).div(10000); // 1%
+      const netAmount = value.sub(tax);
 
-      expect(await cap.balanceOf(user1.address)).to.equal(user1BalanceBefore - value);
-      expect(await cap.balanceOf(user2.address)).to.equal(user2BalanceBefore + netAmount);
+      expect(await cap.balanceOf(user1.address)).to.equal(user1BalanceBefore.sub(value));
+      expect(await cap.balanceOf(user2.address)).to.equal(user2BalanceBefore.add(netAmount));
     });
 
     it("Should reject permit with invalid signature", async function () {
       const deadline = Math.floor(Date.now() / 1000) + 3600;
-      const value = ethers.parseEther("1000");
+      const value = ethers.utils.parseEther("1000");
       const _nonce = await cap.nonces(user1.address);
 
       // Create invalid signature
@@ -153,13 +153,13 @@ describe("Advanced Security Tests", function () {
       const currentBlock = await ethers.provider.getBlock("latest");
       const currentTime = currentBlock!.timestamp;
       const expiredDeadline = currentTime - 3600; // 1 hour ago from current block time
-      const value = ethers.parseEther("1000");
+      const value = ethers.utils.parseEther("1000");
 
       const domain = {
         name: await cap.name(),
         version: "1",
         chainId: (await ethers.provider.getNetwork()).chainId,
-        verifyingContract: await cap.getAddress(),
+        verifyingContract: cap.address,
       };
 
       const types = {
@@ -182,8 +182,8 @@ describe("Advanced Security Tests", function () {
         deadline: expiredDeadline,
       };
 
-      const signature = await user1.signTypedData(domain, types, message);
-      const { v, r, s } = ethers.Signature.from(signature);
+      const signature = await user1._signTypedData(domain, types, message);
+      const { v, r, s } = ethers.utils.splitSignature(signature);
 
       await expect(cap.permit(user1.address, user2.address, value, expiredDeadline, v, r, s)).to.be.reverted;
     });
@@ -200,7 +200,7 @@ describe("Advanced Security Tests", function () {
       await ethers.provider.send("evm_mine", []);
 
       await cap.connect(owner).applyTaxChange();
-      await cap.connect(owner).transfer(user2.address, ethers.parseEther("1000"));
+      await cap.connect(owner).transfer(user2.address, ethers.utils.parseEther("1000"));
 
       // Record all state
       const stateBefore = {
@@ -223,7 +223,7 @@ describe("Advanced Security Tests", function () {
       const newImpl = await CAPv2.deploy();
 
       // Upgrade
-      await cap.connect(owner).upgradeToAndCall(await newImpl.getAddress(), "0x");
+      await cap.connect(owner).upgradeToAndCall(newImpl.address, "0x");
 
       // Verify all state preserved
       expect(await cap.name()).to.equal(stateBefore.name);
@@ -252,7 +252,7 @@ describe("Advanced Security Tests", function () {
       // Upgrade contract
       const CAPv2 = await ethers.getContractFactory("CAPToken");
       const newImpl = await CAPv2.deploy();
-      await cap.connect(owner).upgradeToAndCall(await newImpl.getAddress(), "0x");
+      await cap.connect(owner).upgradeToAndCall(newImpl.address, "0x");
 
       // Verify pending state preserved
       expect(await cap.taxChangeTimestamp()).to.equal(timestampBefore);
@@ -286,8 +286,8 @@ describe("Advanced Security Tests", function () {
       await cap.connect(owner).applyTaxChange();
 
       // Perform transfers
-      await cap.connect(owner).transfer(user1.address, ethers.parseEther("500"));
-      await cap.connect(user1).transfer(user2.address, ethers.parseEther("100"));
+      await cap.connect(owner).transfer(user1.address, ethers.utils.parseEther("500"));
+      await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("100"));
 
       // Verify all storage slots
       expect(await cap.isPool(user1.address)).to.be.true;
@@ -309,7 +309,7 @@ describe("Advanced Security Tests", function () {
       const currentSupply = await cap.totalSupply();
 
       // Calculate available supply within rate limit (100M per 30 days)
-      const rateLimitCap = ethers.parseEther("100000000");
+      const rateLimitCap = ethers.utils.parseEther("100000000");
       const mintAmount = rateLimitCap < maxSupply - currentSupply ? rateLimitCap : maxSupply - currentSupply;
 
       // Should succeed: mint within rate limit and supply cap
@@ -328,10 +328,10 @@ describe("Advanced Security Tests", function () {
     it("Should handle minting close to max supply", async function () {
       const _maxSupply = await cap.MAX_SUPPLY();
       const _currentSupply = await cap.totalSupply();
-      const _rateLimitCap = ethers.parseEther("100000000");
+      const _rateLimitCap = ethers.utils.parseEther("100000000");
 
       // Mint within rate limit
-      const mintAmount = ethers.parseEther("50000000"); // 50M
+      const mintAmount = ethers.utils.parseEther("50000000"); // 50M
       await cap.connect(owner).proposeMint(user1.address, mintAmount);
 
       // Fast forward 7 days
@@ -341,7 +341,7 @@ describe("Advanced Security Tests", function () {
       await cap.connect(owner).executeMint();
 
       // Should still be able to mint remaining (within rate limit)
-      const remaining = ethers.parseEther("50000000"); // Another 50M
+      const remaining = ethers.utils.parseEther("50000000"); // Another 50M
       await cap.connect(owner).proposeMint(user2.address, remaining);
 
       // Fast forward 7 days
@@ -355,7 +355,7 @@ describe("Advanced Security Tests", function () {
     });
 
     it("Should allow minting after burning brings supply below cap", async function () {
-      const mintAmount = ethers.parseEther("50000000"); // 50M
+      const mintAmount = ethers.utils.parseEther("50000000"); // 50M
 
       // Mint within rate limit
       await cap.connect(owner).proposeMint(user1.address, mintAmount);
@@ -367,10 +367,10 @@ describe("Advanced Security Tests", function () {
       await cap.connect(owner).executeMint();
 
       // Burn some tokens
-      await cap.connect(user1).burn(ethers.parseEther("1000"));
+      await cap.connect(user1).burn(ethers.utils.parseEther("1000"));
 
       // Mint more (within rate limit)
-      await cap.connect(owner).proposeMint(user2.address, ethers.parseEther("10000000"));
+      await cap.connect(owner).proposeMint(user2.address, ethers.utils.parseEther("10000000"));
 
       // Fast forward 7 days
       await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);

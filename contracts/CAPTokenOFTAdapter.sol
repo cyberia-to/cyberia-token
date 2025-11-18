@@ -70,6 +70,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract CAPTokenOFTAdapter is OFTAdapter {
 	using SafeERC20 for IERC20;
 
+	// Maximum allowed slippage on inbound transfers (in basis points)
+	// This prevents governance from unexpectedly increasing tax rates on in-flight transactions
+	// Set to 500 basis points (5%) by default - can be adjusted by owner if needed
+	uint256 public maxInboundSlippageBp = 500;
+
 	/**
 	 * @notice Emitted when tokens are locked in the adapter
 	 * @param sender Address that initiated the bridge
@@ -88,16 +93,39 @@ contract CAPTokenOFTAdapter is OFTAdapter {
 	event TokensUnlocked(address indexed recipient, uint256 amountRequested, uint256 amountReceived);
 
 	/**
+	 * @notice Emitted when max inbound slippage is updated
+	 * @param oldSlippageBp Previous max slippage in basis points
+	 * @param newSlippageBp New max slippage in basis points
+	 */
+	event MaxInboundSlippageUpdated(uint256 oldSlippageBp, uint256 newSlippageBp);
+
+	/**
 	 * @notice Initialize the OFT Adapter
 	 * @param _token The CAP token address on Ethereum
 	 * @param _lzEndpoint The LayerZero V2 endpoint address for Ethereum
-	 * @param _owner The owner address (should be governance/DAO)
+	 * @param _governance The governance/DAO address (will be set as owner)
 	 *
 	 * LayerZero V2 Endpoints:
 	 * - Ethereum Mainnet: 0x1a44076050125825900e736c501f859c50fE728c
 	 * - Ethereum Sepolia: 0x6EDCE65403992e310A62460808c4b910D972f10f
 	 */
-	constructor(address _token, address _lzEndpoint, address _owner) OFTAdapter(_token, _lzEndpoint, _owner) Ownable(_owner) {}
+	constructor(address _token, address _lzEndpoint, address _governance) OFTAdapter(_token, _lzEndpoint, _governance) Ownable(_governance) {}
+
+	/**
+	 * @notice Set the maximum allowed slippage for inbound transfers
+	 * @dev Only callable by owner. Prevents governance from unexpectedly increasing tax rates on in-flight transactions.
+	 * @param _newSlippageBp New maximum slippage in basis points (e.g., 500 = 5%)
+	 *
+	 * This limit prevents a scenario where governance increases transfer tax while a user's
+	 * cross-chain transaction is in-flight, causing them to receive fewer tokens than expected.
+	 * With a 5% slippage limit, the most governance can impact an in-flight transaction is 5%.
+	 */
+	function setMaxInboundSlippage(uint256 _newSlippageBp) external onlyOwner {
+		require(_newSlippageBp <= 10000, "CAPOFTAdapter: slippage bp exceeds 100%");
+		uint256 oldSlippageBp = maxInboundSlippageBp;
+		maxInboundSlippageBp = _newSlippageBp;
+		emit MaxInboundSlippageUpdated(oldSlippageBp, _newSlippageBp);
+	}
 
 	/**
 	 * @notice Locks tokens from sender with fee-on-transfer support
@@ -164,12 +192,12 @@ contract CAPTokenOFTAdapter is OFTAdapter {
 	}
 
 	/**
-	 * @notice Unlocks tokens to recipient with fee-on-transfer support
+	 * @notice Unlocks tokens to recipient with fee-on-transfer support and slippage protection
 	 * @dev Overrides the default OFTAdapter implementation to handle potential transfer tax on unlock
+	 *      and enforces slippage protection against unexpected tax increases from governance.
 	 *
 	 * @param _to The address to credit the tokens to
 	 * @param _amountLD The amount of tokens to credit in local decimals
-	 * @param _srcEid The source chain ID (unused but required by interface)
 	 * @return amountReceivedLD The actual amount received by recipient (after any tax)
 	 *
 	 * ## Flow
@@ -177,25 +205,31 @@ contract CAPTokenOFTAdapter is OFTAdapter {
 	 * 2. Transfer tokens from adapter to recipient (safeTransfer)
 	 * 3. Check recipient's balance after transfer
 	 * 4. Calculate actual received amount (balanceAfter - balanceBefore)
-	 * 5. Return actual received amount
+	 * 5. Enforce slippage protection: ensure amount received >= (amount - slippage tolerance)
+	 * 6. Return actual received amount
 	 *
-	 * ## Example (with pool exemption - recommended)
-	 * - Adapter sends 99 CAP
-	 * - Transfer tax: 0 CAP (adapter is pool, exempt)
+	 * ## Slippage Protection
+	 * The maximum slippage is configurable via setMaxInboundSlippage() and defaults to 5%.
+	 * This prevents governance from suddenly increasing transfer taxes while a user's
+	 * cross-chain transaction is in-flight, which would cause them to receive fewer tokens
+	 * than anticipated without any means to cancel.
+	 *
+	 * ## Example (with 1% transfer tax and 5% slippage limit)
+	 * - Adapter sends 100 CAP
+	 * - Transfer tax: 1 CAP (1%)
 	 * - Recipient receives: 99 CAP
+	 * - Slippage check: 99 >= (100 * 9500 / 10000) = 99 >= 95 ✓ PASS
 	 * - amountReceivedLD = 99
 	 *
-	 * ## Example (without pool exemption - not recommended)
-	 * - Adapter sends 99 CAP
-	 * - Transfer tax: ~1 CAP (1% of 99)
-	 * - Recipient receives: ~98 CAP
-	 * - amountReceivedLD = 98
-	 * - User loses 2 CAP total (1% on lock + 1% on unlock)
-	 *
-	 * ## Note
-	 * If adapter is properly added as pool, the tax should be 0 and recipient receives full amount.
+	 * ## Example (with unexpected 10% transfer tax and 5% slippage limit)
+	 * - If governance raises tax to 10% unexpectedly while tx is in-flight:
+	 * - Adapter sends 100 CAP
+	 * - Transfer tax: 10 CAP (10%)
+	 * - Recipient receives: 90 CAP
+	 * - Slippage check: 90 >= (100 * 9500 / 10000) = 90 >= 95 ✗ REVERTED
+	 * - Transaction reverts, protecting user from unexpected loss
 	 */
-	function _credit(address _to, uint256 _amountLD, uint32 _srcEid) internal override returns (uint256 amountReceivedLD) {
+	function _credit(address _to, uint256 _amountLD, uint32) internal override returns (uint256 amountReceivedLD) {
 		// Get recipient's balance before transfer
 		uint256 balanceBefore = innerToken.balanceOf(_to);
 
@@ -206,8 +240,13 @@ contract CAPTokenOFTAdapter is OFTAdapter {
 		uint256 balanceAfter = innerToken.balanceOf(_to);
 
 		// Calculate actual amount received (after any transfer tax)
-		// If adapter is added as pool (recommended), this should equal _amountLD
 		amountReceivedLD = balanceAfter - balanceBefore;
+
+		// Enforce slippage protection: ensure we received at least the minimum acceptable amount
+		// Formula: minimumAmount = amountSent * (10000 - maxSlippageBp) / 10000
+		// This protects against governance unexpectedly increasing tax rates on in-flight transactions
+		uint256 minAmountLD = (_amountLD * (10000 - maxInboundSlippageBp)) / 10000;
+		require(amountReceivedLD >= minAmountLD, "CAPOFTAdapter: inbound slippage exceeded");
 
 		emit TokensUnlocked(_to, _amountLD, amountReceivedLD);
 	}

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { CAPToken } from "../../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 import { impersonateAccount, setBalance } from "@nomicfoundation/hardhat-network-helpers";
 
 /**
@@ -15,9 +15,9 @@ import { impersonateAccount, setBalance } from "@nomicfoundation/hardhat-network
  */
 describe("Mainnet Fork Integration Tests", function () {
   let cap: CAPToken;
-  let owner: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let user1: HardhatEthersSigner;
+  let owner: Signer;
+  let treasury: Signer;
+  let user1: Signer;
 
   // Uniswap V2 addresses on mainnet
   const UNISWAP_V2_ROUTER = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
@@ -69,7 +69,7 @@ describe("Mainnet Fork Integration Tests", function () {
     })) as unknown as CAPToken;
 
     // Give some tokens to test users
-    await cap.connect(owner).transfer(user1.address, ethers.parseEther("1000000"));
+    await cap.connect(owner).transfer(user1.address, ethers.utils.parseEther("1000000"));
   });
 
   describe("Uniswap V2 Integration", function () {
@@ -79,26 +79,26 @@ describe("Mainnet Fork Integration Tests", function () {
       const IUniswapV2Router = await ethers.getContractAt("IUniswapV2Router02", UNISWAP_V2_ROUTER);
 
       // Create pair
-      const tx = await IUniswapV2Factory.createPair(await cap.getAddress(), WETH);
+      const tx = await IUniswapV2Factory.createPair(cap.address, WETH);
       await tx.wait();
 
-      const pairAddress = await IUniswapV2Factory.getPair(await cap.getAddress(), WETH);
-      expect(pairAddress).to.not.equal(ethers.ZeroAddress);
+      const pairAddress = await IUniswapV2Factory.getPair(cap.address, WETH);
+      expect(pairAddress).to.not.equal(ethers.constants.AddressZero);
 
       // Register pair as pool for tax purposes
       await cap.connect(owner).addPool(pairAddress);
 
       // Approve router
-      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.parseEther("100000"));
+      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.utils.parseEther("100000"));
 
       // Add liquidity (requires ETH)
-      const tokenAmount = ethers.parseEther("50000");
-      const ethAmount = ethers.parseEther("10");
+      const tokenAmount = ethers.utils.parseEther("50000");
+      const ethAmount = ethers.utils.parseEther("10");
 
       const deadline = Math.floor(Date.now() / 1000) + 3600;
 
       await IUniswapV2Router.addLiquidityETH(
-        await cap.getAddress(),
+        cap.address,
         tokenAmount,
         0, // amountTokenMin
         0, // amountETHMin
@@ -121,28 +121,28 @@ describe("Mainnet Fork Integration Tests", function () {
 
       const IUniswapV2Router = await ethers.getContractAt("IUniswapV2Router02", UNISWAP_V2_ROUTER);
 
-      await IUniswapV2Factory.createPair(await cap.getAddress(), WETH);
-      const pairAddress = await IUniswapV2Factory.getPair(await cap.getAddress(), WETH);
+      await IUniswapV2Factory.createPair(cap.address, WETH);
+      const pairAddress = await IUniswapV2Factory.getPair(cap.address, WETH);
 
       // Register pair
       await cap.connect(owner).addPool(pairAddress);
 
       // Add liquidity
-      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.parseEther("100000"));
+      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.utils.parseEther("100000"));
       const deadline = Math.floor(Date.now() / 1000) + 3600;
 
       await IUniswapV2Router.addLiquidityETH(
-        await cap.getAddress(),
-        ethers.parseEther("50000"),
+        cap.address,
+        ethers.utils.parseEther("50000"),
         0,
         0,
         owner.address,
         deadline,
-        { value: ethers.parseEther("10") }
+        { value: ethers.utils.parseEther("10") }
       );
 
       // Now test swap (sell CAP for ETH)
-      const swapAmount = ethers.parseEther("1000");
+      const swapAmount = ethers.utils.parseEther("1000");
       await cap.connect(user1).approve(UNISWAP_V2_ROUTER, swapAmount);
 
       const treasuryBefore = await cap.balanceOf(treasury.address);
@@ -150,7 +150,7 @@ describe("Mainnet Fork Integration Tests", function () {
       await IUniswapV2Router.connect(user1).swapExactTokensForETHSupportingFeeOnTransferTokens(
         swapAmount,
         0, // amountOutMin
-        [await cap.getAddress(), WETH],
+        [cap.address, WETH],
         user1.address,
         deadline
       );
@@ -168,22 +168,22 @@ describe("Mainnet Fork Integration Tests", function () {
 
       const IUniswapV2Router = await ethers.getContractAt("IUniswapV2Router02", UNISWAP_V2_ROUTER);
 
-      await IUniswapV2Factory.createPair(await cap.getAddress(), WETH);
-      const pairAddress = await IUniswapV2Factory.getPair(await cap.getAddress(), WETH);
+      await IUniswapV2Factory.createPair(cap.address, WETH);
+      const pairAddress = await IUniswapV2Factory.getPair(cap.address, WETH);
 
       await cap.connect(owner).addPool(pairAddress);
-      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.parseEther("100000"));
+      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.utils.parseEther("100000"));
 
       const deadline = Math.floor(Date.now() / 1000) + 3600;
 
       await IUniswapV2Router.addLiquidityETH(
-        await cap.getAddress(),
-        ethers.parseEther("50000"),
+        cap.address,
+        ethers.utils.parseEther("50000"),
         0,
         0,
         owner.address,
         deadline,
-        { value: ethers.parseEther("10") }
+        { value: ethers.utils.parseEther("10") }
       );
 
       // Buy CAP with ETH
@@ -192,10 +192,10 @@ describe("Mainnet Fork Integration Tests", function () {
 
       await IUniswapV2Router.connect(user1).swapExactETHForTokensSupportingFeeOnTransferTokens(
         0, // amountOutMin
-        [WETH, await cap.getAddress()],
+        [WETH, cap.address],
         user1.address,
         deadline,
-        { value: ethers.parseEther("1") }
+        { value: ethers.utils.parseEther("1") }
       );
 
       const treasuryAfter = await cap.balanceOf(treasury.address);
@@ -214,7 +214,7 @@ describe("Mainnet Fork Integration Tests", function () {
       const IWETH = await ethers.getContractAt("IWETH9", WETH);
 
       // Wrap some ETH
-      const wrapAmount = ethers.parseEther("5");
+      const wrapAmount = ethers.utils.parseEther("5");
       await IWETH.connect(user1).deposit({ value: wrapAmount });
 
       expect(await IWETH.balanceOf(user1.address)).to.equal(wrapAmount);
@@ -230,17 +230,17 @@ describe("Mainnet Fork Integration Tests", function () {
     it("Should test with impersonated rich account", async function () {
       // Impersonate a rich account
       await impersonateAccount(RICH_ACCOUNT);
-      await setBalance(RICH_ACCOUNT, ethers.parseEther("100"));
+      await setBalance(RICH_ACCOUNT, ethers.utils.parseEther("100"));
 
       const richSigner = await ethers.getSigner(RICH_ACCOUNT);
 
       // Give CAP tokens to rich account
-      await cap.connect(owner).transfer(RICH_ACCOUNT, ethers.parseEther("10000"));
+      await cap.connect(owner).transfer(RICH_ACCOUNT, ethers.utils.parseEther("10000"));
 
       expect(await cap.balanceOf(RICH_ACCOUNT)).to.be.gt(0);
 
       // Rich account can transfer
-      await cap.connect(richSigner).transfer(user1.address, ethers.parseEther("1000"));
+      await cap.connect(richSigner).transfer(user1.address, ethers.utils.parseEther("1000"));
 
       // Verify tax was applied
       const treasuryBalance = await cap.balanceOf(treasury.address);
@@ -255,34 +255,34 @@ describe("Mainnet Fork Integration Tests", function () {
       const IUniswapV2Router = await ethers.getContractAt("IUniswapV2Router02", UNISWAP_V2_ROUTER);
 
       // Create pair
-      await IUniswapV2Factory.createPair(await cap.getAddress(), WETH);
-      const pairAddress = await IUniswapV2Factory.getPair(await cap.getAddress(), WETH);
+      await IUniswapV2Factory.createPair(cap.address, WETH);
+      const pairAddress = await IUniswapV2Factory.getPair(cap.address, WETH);
       await cap.connect(owner).addPool(pairAddress);
 
       // Add liquidity
-      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.parseEther("100000"));
+      await cap.connect(owner).approve(UNISWAP_V2_ROUTER, ethers.utils.parseEther("100000"));
       const deadline = Math.floor(Date.now() / 1000) + 3600;
 
       const liquidityTx = await IUniswapV2Router.addLiquidityETH(
-        await cap.getAddress(),
-        ethers.parseEther("50000"),
+        cap.address,
+        ethers.utils.parseEther("50000"),
         0,
         0,
         owner.address,
         deadline,
-        { value: ethers.parseEther("10") }
+        { value: ethers.utils.parseEther("10") }
       );
       const liquidityReceipt = await liquidityTx.wait();
 
       console.log("    Gas used for adding liquidity:", liquidityReceipt?.gasUsed.toString());
 
       // Perform swap
-      await cap.connect(user1).approve(UNISWAP_V2_ROUTER, ethers.parseEther("1000"));
+      await cap.connect(user1).approve(UNISWAP_V2_ROUTER, ethers.utils.parseEther("1000"));
 
       const swapTx = await IUniswapV2Router.connect(user1).swapExactTokensForETHSupportingFeeOnTransferTokens(
-        ethers.parseEther("1000"),
+        ethers.utils.parseEther("1000"),
         0,
-        [await cap.getAddress(), WETH],
+        [cap.address, WETH],
         user1.address,
         deadline
       );

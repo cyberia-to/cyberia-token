@@ -1,8 +1,8 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 echo "🔍 Running pre-commit checks..."
 echo ""
+
+# Ensure Foundry is in PATH (for systems like Fork that don't source shell configs)
+export PATH="$HOME/.foundry/bin:$PATH"
 
 # Run lint-staged for linting and formatting
 echo "📝 Linting and formatting..."

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { CAPToken, MockDEXPair } from "../../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 
 describe("DAO Integration Tests", function () {
   let cap: CAPToken;
@@ -9,11 +9,11 @@ describe("DAO Integration Tests", function () {
   let mockPool2: MockDEXPair;
   let pool1Address: string;
   let pool2Address: string;
-  let owner: HardhatEthersSigner;
-  let dao: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let user1: HardhatEthersSigner;
-  let user2: HardhatEthersSigner;
+  let owner: Signer;
+  let dao: Signer;
+  let treasury: Signer;
+  let user1: Signer;
+  let user2: Signer;
 
   beforeEach(async function () {
     [owner, dao, treasury, user1, user2] = await ethers.getSigners();
@@ -28,13 +28,13 @@ describe("DAO Integration Tests", function () {
     // Deploy Mock DEX Pairs for pool testing
     const MockDEXPair = await ethers.getContractFactory("MockDEXPair");
     const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
-    mockPool1 = await MockDEXPair.deploy(await cap.getAddress(), WETH);
-    mockPool2 = await MockDEXPair.deploy(await cap.getAddress(), WETH);
-    pool1Address = await mockPool1.getAddress();
-    pool2Address = await mockPool2.getAddress();
+    mockPool1 = await MockDEXPair.deploy(cap.address, WETH);
+    mockPool2 = await MockDEXPair.deploy(cap.address, WETH);
+    pool1Address = mockPool1.address;
+    pool2Address = mockPool2.address;
 
     // Give DAO some tokens before transferring governance
-    await cap.connect(owner).transfer(dao.address, ethers.parseEther("500000000"));
+    await cap.connect(owner).transfer(dao.address, ethers.utils.parseEther("500000000"));
 
     // Transfer governance to DAO
     await cap.connect(owner).setGovernance(dao.address);
@@ -58,8 +58,8 @@ describe("DAO Integration Tests", function () {
   describe("Treasury Management", function () {
     beforeEach(async function () {
       // Distribute tokens (DAO already has governance from main beforeEach)
-      await cap.connect(dao).transfer(user1.address, ethers.parseEther("100000"));
-      await cap.connect(dao).transfer(user2.address, ethers.parseEther("100000"));
+      await cap.connect(dao).transfer(user1.address, ethers.utils.parseEther("100000"));
+      await cap.connect(dao).transfer(user2.address, ethers.utils.parseEther("100000"));
     });
 
     it("Should allow DAO to update treasury address", async function () {
@@ -73,28 +73,28 @@ describe("DAO Integration Tests", function () {
       expect(await cap.feeRecipient()).to.equal(newTreasury);
 
       // Test that new treasury receives fees
-      const transferAmount = ethers.parseEther("1000");
-      const expectedTax = (transferAmount * 100n) / 10000n; // 1%
+      const transferAmount = ethers.utils.parseEther("1000");
+      const expectedTax = transferAmount.mul(100).div(10000); // 1%
 
       const newTreasuryInitialBalance = await cap.balanceOf(newTreasury);
 
       await cap.connect(user1).transfer(user2.address, transferAmount);
 
-      expect(await cap.balanceOf(newTreasury)).to.equal(newTreasuryInitialBalance + expectedTax);
+      expect(await cap.balanceOf(newTreasury)).to.equal(newTreasuryInitialBalance.add(expectedTax));
     });
 
     it("Should allow DAO to enable burn mode", async function () {
-      await cap.connect(dao).setFeeRecipient(ethers.ZeroAddress);
+      await cap.connect(dao).setFeeRecipient(ethers.constants.AddressZero);
 
-      const transferAmount = ethers.parseEther("1000");
-      const expectedTax = (transferAmount * 100n) / 10000n; // 1%
+      const transferAmount = ethers.utils.parseEther("1000");
+      const expectedTax = transferAmount.mul(100).div(10000); // 1%
 
       const initialSupply = await cap.totalSupply();
 
       await cap.connect(user1).transfer(user2.address, transferAmount);
 
       // Supply should decrease by tax amount
-      expect(await cap.totalSupply()).to.equal(initialSupply - expectedTax);
+      expect(await cap.totalSupply()).to.equal(initialSupply.sub(expectedTax));
     });
   });
 
@@ -144,16 +144,16 @@ describe("DAO Integration Tests", function () {
 
     it("Should apply correct taxes based on pool status", async function () {
       await cap.connect(dao).addPool(pool1Address);
-      await cap.connect(dao).transfer(user1.address, ethers.parseEther("10000"));
-      await cap.connect(dao).transfer(pool1Address, ethers.parseEther("10000"));
+      await cap.connect(dao).transfer(user1.address, ethers.utils.parseEther("10000"));
+      await cap.connect(dao).transfer(pool1Address, ethers.utils.parseEther("10000"));
 
-      const transferAmount = ethers.parseEther("1000");
+      const transferAmount = ethers.utils.parseEther("1000");
       const treasuryBefore = await cap.balanceOf(treasury.address);
 
       // Sell to pool: transfer + sell tax = 2%
       await cap.connect(user1).transfer(pool1Address, transferAmount);
       const treasuryAfter1 = await cap.balanceOf(treasury.address);
-      expect(treasuryAfter1 - treasuryBefore).to.equal((transferAmount * 200n) / 10000n);
+      expect(treasuryAfter1.sub(treasuryBefore)).to.equal(transferAmount.mul(200).div(10000));
 
       // Buy from pool: 0% tax (impersonate pool contract)
       await ethers.provider.send("hardhat_impersonateAccount", [pool1Address]);
@@ -162,15 +162,15 @@ describe("DAO Integration Tests", function () {
       const user2Before = await cap.balanceOf(user2.address);
       await cap.connect(poolSigner).transfer(user2.address, transferAmount);
       await ethers.provider.send("hardhat_stopImpersonatingAccount", [pool1Address]);
-      expect(await cap.balanceOf(user2.address)).to.equal(user2Before + transferAmount);
+      expect(await cap.balanceOf(user2.address)).to.equal(user2Before.add(transferAmount));
     });
   });
 
   describe("Governance Token Features", function () {
     beforeEach(async function () {
       // DAO already has governance and tokens from main beforeEach
-      await cap.connect(dao).transfer(user1.address, ethers.parseEther("50000"));
-      await cap.connect(dao).transfer(user2.address, ethers.parseEther("30000"));
+      await cap.connect(dao).transfer(user1.address, ethers.utils.parseEther("50000"));
+      await cap.connect(dao).transfer(user2.address, ethers.utils.parseEther("30000"));
     });
 
     it("Should support delegation for governance voting", async function () {
@@ -189,7 +189,7 @@ describe("DAO Integration Tests", function () {
       await cap.connect(user1).delegate(user2.address);
 
       expect(await cap.getVotes(user1.address)).to.equal(0);
-      expect(await cap.getVotes(user2.address)).to.equal(user1Balance + user2Balance);
+      expect(await cap.getVotes(user2.address)).to.equal(user1Balance.add(user2Balance));
     });
 
     it("Should track voting power correctly after transfers", async function () {
@@ -200,7 +200,7 @@ describe("DAO Integration Tests", function () {
       expect(initialVotingPower).to.equal(initialBalance);
 
       // Transfer some tokens
-      await cap.connect(user1).transfer(user2.address, ethers.parseEther("10000"));
+      await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("10000"));
 
       // Voting power should equal current balance after transfer
       const finalBalance = await cap.balanceOf(user1.address);
@@ -216,14 +216,14 @@ describe("DAO Integration Tests", function () {
       const initialVotingPower = await cap.getVotes(user1.address);
 
       // Set fee recipient to burn address
-      await cap.connect(dao).setFeeRecipient(ethers.ZeroAddress);
+      await cap.connect(dao).setFeeRecipient(ethers.constants.AddressZero);
 
       // Make a transfer that burns taxes
-      await cap.connect(user1).transfer(user2.address, ethers.parseEther("1000"));
+      await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("1000"));
 
       // Voting power should reflect the net balance
-      const netTransferAmount = ethers.parseEther("1000");
-      const expectedVotingPower = initialVotingPower - netTransferAmount;
+      const netTransferAmount = ethers.utils.parseEther("1000");
+      const expectedVotingPower = initialVotingPower.sub(netTransferAmount);
 
       expect(await cap.getVotes(user1.address)).to.equal(expectedVotingPower);
     });
@@ -246,32 +246,32 @@ describe("DAO Integration Tests", function () {
       await cap.connect(dao).setFeeRecipient(treasury.address);
 
       // Step 5: Test that changes work correctly
-      await cap.connect(dao).transfer(user1.address, ethers.parseEther("10000"));
-      await cap.connect(dao).transfer(user2.address, ethers.parseEther("5000"));
+      await cap.connect(dao).transfer(user1.address, ethers.utils.parseEther("10000"));
+      await cap.connect(dao).transfer(user2.address, ethers.utils.parseEther("5000"));
 
       // Test transfer tax
-      const transferAmount = ethers.parseEther("500"); // Reduced to ensure sufficient balance
-      const transferTax = (transferAmount * 75n) / 10000n; // 0.75%
+      const transferAmount = ethers.utils.parseEther("500"); // Reduced to ensure sufficient balance
+      const transferTax = transferAmount.mul(75).div(10000); // 0.75%
 
       const treasuryBefore = await cap.balanceOf(treasury.address);
       await cap.connect(user1).transfer(user2.address, transferAmount);
       const treasuryAfter = await cap.balanceOf(treasury.address);
 
-      expect(treasuryAfter - treasuryBefore).to.equal(transferTax);
+      expect(treasuryAfter.sub(treasuryBefore)).to.equal(transferTax);
 
       // Test sell tax
-      await cap.connect(dao).transfer(pool1Address, ethers.parseEther("5000"));
+      await cap.connect(dao).transfer(pool1Address, ethers.utils.parseEther("5000"));
 
-      const sellTax = (transferAmount * (75n + 150n)) / 10000n; // 0.75% + 1.5%
+      const sellTax = transferAmount.mul(75 + 150).div(10000); // 0.75% + 1.5%
 
       const treasuryBefore2 = await cap.balanceOf(treasury.address);
       await cap.connect(user2).transfer(pool1Address, transferAmount);
       const treasuryAfter2 = await cap.balanceOf(treasury.address);
 
-      expect(treasuryAfter2 - treasuryBefore2).to.equal(sellTax);
+      expect(treasuryAfter2.sub(treasuryBefore2)).to.equal(sellTax);
 
       // Test buy tax (impersonate pool contract)
-      const buyTax = (transferAmount * 25n) / 10000n; // 0.25%
+      const buyTax = transferAmount.mul(25).div(10000); // 0.25%
 
       const treasuryBefore3 = await cap.balanceOf(treasury.address);
       await ethers.provider.send("hardhat_impersonateAccount", [pool1Address]);
@@ -281,7 +281,7 @@ describe("DAO Integration Tests", function () {
       await ethers.provider.send("hardhat_stopImpersonatingAccount", [pool1Address]);
       const treasuryAfter3 = await cap.balanceOf(treasury.address);
 
-      expect(treasuryAfter3 - treasuryBefore3).to.equal(buyTax);
+      expect(treasuryAfter3.sub(treasuryBefore3)).to.equal(buyTax);
     });
   });
 });

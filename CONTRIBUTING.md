@@ -258,11 +258,14 @@ describe("New Feature", function () {
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (200 Hardhat tests + 106 Foundry = 306 total)
 npm test
 
 # Run specific test file
 npm run test:unit
+
+# Run all tests including Foundry
+npm run test:all
 
 # Generate coverage
 npm run test:coverage
@@ -270,6 +273,8 @@ npm run test:coverage
 # Gas report
 npm run test:gas
 ```
+
+**Expected Results**: All 200 Hardhat tests must pass before submitting a PR. CI will also run Foundry tests (106 additional tests).
 
 ## Security
 

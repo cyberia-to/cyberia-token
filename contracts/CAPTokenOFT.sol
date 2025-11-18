@@ -62,42 +62,4 @@ contract CAPTokenOFT is OFT {
 	 * @dev Decimals are 18 to match Ethereum CAP token
 	 */
 	constructor(address _lzEndpoint, address _owner) OFT("Cyberia", "CAP", _lzEndpoint, _owner) Ownable(_owner) {}
-
-	/**
-	 * @notice Burn tokens from the caller's balance
-	 * @dev Allows users to burn their bridged tokens on destination chains
-	 * @param amount Amount of tokens to burn
-	 *
-	 * ## Use Cases
-	 * - Reduce personal supply
-	 * - Burn unwanted airdropped tokens
-	 * - Participate in burn events
-	 *
-	 * ## Note
-	 * This is separate from bridging burns. When bridging back to Ethereum,
-	 * the OFT automatically burns tokens via _debit() function.
-	 */
-	function burn(uint256 amount) external {
-		_burn(_msgSender(), amount);
-	}
-
-	/**
-	 * @notice Burn tokens from an account with allowance
-	 * @dev Allows approved spenders to burn tokens on behalf of token holders
-	 * @param account Account to burn from
-	 * @param amount Amount of tokens to burn
-	 *
-	 * ## Requirements
-	 * - Caller must have sufficient allowance from account
-	 * - Account must have sufficient balance
-	 *
-	 * ## Use Cases
-	 * - Smart contract integrations (staking, gaming, etc.)
-	 * - Delegated burn operations
-	 * - Protocol-level burns with approval
-	 */
-	function burnFrom(address account, uint256 amount) external {
-		_spendAllowance(account, _msgSender(), amount);
-		_burn(account, amount);
-	}
 }

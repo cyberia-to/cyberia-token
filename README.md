@@ -1,6 +1,6 @@
 # Cyberia (CAP) Token
 
-[![Tests](https://img.shields.io/badge/Tests-297%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
+[![Tests](https://img.shields.io/badge/Tests-200%20Passing-brightgreen)](#testing) [![Sepolia](https://img.shields.io/badge/Sepolia-Deployed-green)](https://sepolia.etherscan.io/address/0xA6B680A88c16056de7194CF775D04A45D0692C11) [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-orange)](contracts/CAPToken.sol)
 
 Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx DAO.
 
@@ -10,7 +10,7 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 - **UUPS Upgradeable**: OpenZeppelin upgradeable pattern with DAO-controlled upgrades
 - **Configurable Tax System**: Transfer/buy/sell taxes (max 5% each, 8% combined) with 24h timelock
 - **AMM Integration**: Pool detection for Uniswap and other DEXs
-- **Burn Mechanism**: Token burning and optional burn mode for taxes
+- **Burn Mechanism**: Token burning (on CAPToken) and optional burn mode for taxes. OFT burn restricted to LayerZero endpoint only (security)
 - **Bridging Ready**: Governance-gated minting (max 10B supply) for future OFT/LayerZero bridging
 - **DAO Governance**: Aragon OSx integration with token-voting plugin
 
@@ -29,10 +29,12 @@ Upgradeable governance ERC-20 token with configurable tax system for Aragon OSx 
 
 - ✅ Pre/post balance checks for fee-on-transfer compatibility
 - ✅ Supply invariant maintained across all chains (X locked = X minted)
-- ✅ Slippage protection with `minAmountLD` parameter
+- ✅ Slippage protection with configurable limits (default 5%, owner-adjustable)
+- ✅ Fee recipient validation (prevents setting contract as recipient)
+- ✅ Burn functions restricted to LayerZero endpoint (OFT security)
 - ✅ Official `@layerzerolabs/oft-evm` base contracts
 - ✅ Comprehensive NatSpec documentation
-- ✅ Full test coverage (297 passing tests: 191 Hardhat + 106 Foundry)
+- ✅ Full test coverage (200 Hardhat tests passing)
 
 **Bridge Fee**:
 
@@ -119,9 +121,9 @@ cd cyberia-token
 npm install
 
 # Run tests
-npm test                     # Hardhat tests (191 passing)
+npm test                     # Hardhat tests (200 passing)
 npm run test:foundry         # Foundry tests (106 passing)
-npm run test:all             # All tests (297 passing: 191 Hardhat + 106 Foundry)
+npm run test:all             # All tests (306 passing: 200 Hardhat + 106 Foundry)
 npm run test:ci              # Full CI validation (linters + all tests)
 npm run test:coverage        # Generate coverage report
 
@@ -229,14 +231,14 @@ npm run oft:check-peers          # Verify configuration
 ### Combined Test Suites (Recommended)
 
 ```bash
-npm run test:all            # Run all tests (297 passing: 191 Hardhat + 106 Foundry)
+npm run test:all            # Run all tests (306 passing: 200 Hardhat + 106 Foundry)
 npm run test:ci             # Full CI validation (linters + all tests)
 ```
 
 ### Hardhat Tests
 
 ```bash
-npm test                    # All Hardhat tests (191 passing)
+npm test                    # All Hardhat tests (200 passing)
 npm run test:unit           # Unit tests
 npm run test:security       # Security tests
 npm run test:integration    # Integration tests
@@ -263,12 +265,12 @@ npm run validate:zodiac     # Validate Zodiac roles config
 
 ### Test Suite Breakdown
 
-#### Hardhat Tests (191 tests passing)
+#### Hardhat Tests (200 tests passing)
 
-- **Unit Tests** (60 tests): Core functionality, deployment, tax system, minting, burning, access control, checkpoints, edge cases
-- **Security Tests** (52 tests): Reentrancy protection, attack vectors, upgrade safety, permit signatures, timelock boundaries
-- **Integration Tests** (32 tests): DAO integration, Zodiac Safe integration, mainnet fork, invariants, delegation
-- **LayerZero Tests** (47 tests): OFTAdapter integration, fee-on-transfer handling, cross-chain supply invariants, peer configuration
+- **Unit Tests** (70+ tests): Core functionality, deployment, tax system, minting, burning, access control, checkpoints, edge cases, rolling mint window
+- **Security Tests** (50+ tests): Reentrancy protection, attack vectors, upgrade safety, permit signatures, timelock boundaries, fee recipient validation
+- **Integration Tests** (35+ tests): DAO integration, Zodiac Safe integration, mainnet fork, invariants, delegation, state consistency
+- **LayerZero Tests** (50+ tests): OFTAdapter integration, fee-on-transfer handling, cross-chain supply invariants, peer configuration, slippage protection
 
 #### Foundry Tests (106 tests)
 
@@ -278,7 +280,7 @@ npm run validate:zodiac     # Validate Zodiac roles config
 - **Stateful Tests** (15 tests): Multi-step complex scenarios with state transitions
 - **Invariant Tests** (15 tests): Mathematical invariants under all conditions (128K calls per run)
 
-**Total Coverage**: 297 tests (191 Hardhat + 106 Foundry) ensuring comprehensive coverage of all contract functionality, cross-chain bridging, and security properties
+**Total Coverage**: 306 tests (200 Hardhat + 106 Foundry) ensuring comprehensive coverage of all contract functionality, cross-chain bridging, security improvements, and property validation
 
 ## Contract Administration
 
@@ -310,11 +312,17 @@ cancelTaxChange()
 ```solidity
 addPool(address pool)                              // Add AMM pool address
 removePool(address pool)                           // Remove AMM pool
-setFeeRecipient(address recipient)                 // 0x0 = burn mode
-proposeMint(address to, uint256 amount)            // Propose minting (max supply: 10B)
+setFeeRecipient(address recipient)                 // 0x0 = burn mode (cannot be contract address)
+proposeMint(address to, uint256 amount)            // Propose minting (max 100M/30-day rolling window, 10B total)
 executeMint()                                      // Execute after 7d timelock
 cancelMint()                                       // Cancel pending mint
 upgradeToAndCall(address newImpl, bytes data)      // UUPS upgrade
+```
+
+**OFTAdapter Functions** (LayerZero V2):
+
+```solidity
+setMaxInboundSlippage(uint256 _newSlippageBp)     // Configure max slippage for inbound transfers (default 5%, max 100%)
 ```
 
 ## DAO Integration
@@ -400,6 +408,10 @@ Board Members
 
 - ✅ Reentrancy protection on all transfers
 - ✅ 24-hour timelock on tax changes (prevents front-running)
+- ✅ 30-day rolling window mint cap (100M per period) to prevent flash minting attacks
+- ✅ Fee recipient validation (prevents setting contract as recipient)
+- ✅ OFT burn functions restricted to LayerZero endpoint (prevents unauthorized burning)
+- ✅ Slippage protection on inbound transfers (default 5%, configurable by owner)
 - ✅ Max supply cap (10B tokens)
 - ✅ OpenZeppelin audited contracts
 - ✅ UUPS upgradeable pattern

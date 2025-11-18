@@ -217,6 +217,15 @@ All proposal operations (create, vote, execute) should be done through the Arago
 7. Click **"Publish"**
 8. Vote automatically recorded (if you have voting power)
 
+**Important Security Constraints**:
+
+When creating proposals, be aware of these safeguards:
+
+- **Minting**: Limited to 100M tokens per 30-day rolling period (prevents flash minting attacks). Total supply capped at 10B.
+- **Fee Recipient**: Cannot be set to the CAP token contract address itself (prevents accidental token locking).
+- **Taxes**: Individual tax rates capped at 5% (500 bp), combined sell tax at 8% (800 bp).
+- **Timelock**: Tax changes require 24-hour delay before execution; minting requires 7-day delay.
+
 ### Voting on Proposals
 
 1. Visit https://app.aragon.org

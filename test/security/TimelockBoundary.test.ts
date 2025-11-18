@@ -1,14 +1,14 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { CAPToken } from "../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Timelock Boundary Tests", function () {
   let cap: CAPToken;
-  let owner: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let user1: HardhatEthersSigner;
+  let owner: Signer;
+  let treasury: Signer;
+  let user1: Signer;
 
   const TIMELOCK_DELAY = 24 * 60 * 60; // 24 hours in seconds
 
@@ -29,7 +29,7 @@ describe("Timelock Boundary Tests", function () {
       const targetTime = await cap.taxChangeTimestamp();
 
       // Set time to exactly 1 second before the target time
-      await time.setNextBlockTimestamp(targetTime - 1n);
+      await time.setNextBlockTimestamp(targetTime.sub(1));
 
       await expect(cap.connect(owner).applyTaxChange()).to.be.revertedWith("TIMELOCK_NOT_EXPIRED");
     });
@@ -284,33 +284,33 @@ describe("Timelock Boundary Tests", function () {
     });
 
     it("Should handle transfers during pending timelock", async function () {
-      await cap.connect(owner).transfer(user1.address, ethers.parseEther("10000"));
+      await cap.connect(owner).transfer(user1.address, ethers.utils.parseEther("10000"));
 
       // Propose tax change
       await cap.connect(owner).proposeTaxChange(400, 400, 200);
 
       // Transfers should use current tax rates
-      const transferAmount = ethers.parseEther("1000");
-      const currentTax = (transferAmount * 100n) / 10000n; // 1%
+      const transferAmount = ethers.utils.parseEther("1000");
+      const currentTax = transferAmount.mul(100).div(10000); // 1%
 
       const treasuryBefore = await cap.balanceOf(treasury.address);
       await cap.connect(user1).transfer(owner.address, transferAmount);
       const treasuryAfter = await cap.balanceOf(treasury.address);
 
-      expect(treasuryAfter - treasuryBefore).to.equal(currentTax);
+      expect(treasuryAfter.sub(treasuryBefore)).to.equal(currentTax);
 
       // Apply new taxes
       await time.increase(TIMELOCK_DELAY + 1);
       await cap.connect(owner).applyTaxChange();
 
       // New transfers should use new tax rates
-      const newTax = (transferAmount * 400n) / 10000n; // 4%
+      const newTax = transferAmount.mul(400).div(10000); // 4%
 
       const treasuryBefore2 = await cap.balanceOf(treasury.address);
       await cap.connect(user1).transfer(owner.address, transferAmount);
       const treasuryAfter2 = await cap.balanceOf(treasury.address);
 
-      expect(treasuryAfter2 - treasuryBefore2).to.equal(newTax);
+      expect(treasuryAfter2.sub(treasuryBefore2)).to.equal(newTax);
     });
 
     it("Should preserve pending proposal through governance transfer", async function () {
@@ -361,7 +361,9 @@ describe("Timelock Boundary Tests", function () {
       const tx2 = await cap.connect(owner).applyTaxChange();
       const receipt2 = await tx2.wait();
 
-      const totalGas = (receipt1?.gasUsed || 0n) + (receipt2?.gasUsed || 0n);
+      const gas1 = receipt1?.gasUsed || ethers.BigNumber.from(0);
+      const gas2 = receipt2?.gasUsed || ethers.BigNumber.from(0);
+      const totalGas = gas1.add(gas2);
 
       // Two-step process should be reasonable
       expect(totalGas).to.be.lt(250000);

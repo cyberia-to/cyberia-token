@@ -1,7 +1,8 @@
 import { config as dotenvConfig } from "dotenv";
 dotenvConfig();
 
-import "@nomicfoundation/hardhat-toolbox";
+import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 import "@typechain/hardhat";
 import "hardhat-contract-sizer";
@@ -235,7 +236,7 @@ const config: HardhatUserConfig = {
   // TypeChain configuration
   typechain: {
     outDir: "typechain-types",
-    target: "ethers-v6",
+    target: "ethers-v5",
   },
 
   // Path configurations

@@ -1,16 +1,16 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { CAPToken } from "../../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 import zodiacConfig from "../../docs/zodiac-roles-config.json";
 
 describe("Zodiac Safe Integration Tests", function () {
   let cap: CAPToken;
-  let owner: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let daoAddress: HardhatEthersSigner;
-  let boardMember1: HardhatEthersSigner;
-  let user: HardhatEthersSigner;
+  let owner: Signer;
+  let treasury: Signer;
+  let daoAddress: Signer;
+  let boardMember1: Signer;
+  let user: Signer;
 
   // Simulated Safe address (in real scenario, this would be actual Safe contract)
   let safeAddress: string;
@@ -69,10 +69,20 @@ describe("Zodiac Safe Integration Tests", function () {
 
                 let actualSelector: string;
                 try {
-                  actualSelector = iface.getFunction(functionSignature)!.selector;
+                  // Verify function exists in the contract interface (by attempting to get it)
+                  iface.getFunction(functionSignature)!;
+                  // Compute selector from keccak256 hash of signature
+                  const hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(functionSignature));
+                  actualSelector = hash.slice(0, 10); // Take first 4 bytes (10 chars in hex)
                 } catch {
                   // Try without parameters if it fails
-                  actualSelector = iface.getFunction(baseName)!.selector;
+                  try {
+                    iface.getFunction(baseName)!;
+                    const hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`${baseName}()`));
+                    actualSelector = hash.slice(0, 10);
+                  } catch {
+                    throw new Error(`Function ${functionName} not found`);
+                  }
                 }
 
                 const isValid = actualSelector.toLowerCase() === expectedSelector.toLowerCase();
@@ -136,7 +146,7 @@ describe("Zodiac Safe Integration Tests", function () {
       console.log("\n🔍 Checking Required Admin Functions\n");
 
       for (const funcName of requiredFunctions) {
-        const hasFunction = cap.interface.hasFunction(funcName);
+        const hasFunction = cap.interface.getFunction(funcName) !== undefined;
         console.log(`${hasFunction ? "✅" : "❌"} ${funcName}`);
         expect(hasFunction, `Function ${funcName} should exist`).to.be.true;
       }
@@ -147,10 +157,10 @@ describe("Zodiac Safe Integration Tests", function () {
     describe("BOARD_DAILY_OPS Role", function () {
       it("Should allow board to transfer small amounts (<50k CAP)", async function () {
         // Setup: Transfer tokens to Safe
-        await cap.connect(owner).transfer(safeAddress, ethers.parseEther("100000"));
+        await cap.connect(owner).transfer(safeAddress, ethers.utils.parseEther("100000"));
 
         // Simulate board transfer of 30k CAP (under 50k limit)
-        const smallAmount = ethers.parseEther("30000");
+        const smallAmount = ethers.utils.parseEther("30000");
 
         // In real scenario, this would go through Safe + Zodiac Roles
         // Here we simulate the Safe executing the transfer
@@ -158,7 +168,7 @@ describe("Zodiac Safe Integration Tests", function () {
 
         const userBalance = await cap.balanceOf(user.address);
         // Note: Transfer tax (1%) is applied, so user receives 99% of the amount
-        const expectedAmount = (smallAmount * BigInt(9900)) / BigInt(10000);
+        const expectedAmount = smallAmount.mul(9900).div(10000);
         expect(userBalance).to.equal(expectedAmount);
       });
 
@@ -228,7 +238,7 @@ describe("Zodiac Safe Integration Tests", function () {
       });
 
       it("Should allow DAO to propose and execute mint within max supply", async function () {
-        const mintAmount = ethers.parseEther("1000000");
+        const mintAmount = ethers.utils.parseEther("1000000");
         await cap.connect(daoAddress).proposeMint(user.address, mintAmount);
 
         // Fast forward 7 days
@@ -291,13 +301,13 @@ describe("Zodiac Safe Integration Tests", function () {
   describe("Complete Governance Workflow Simulation", function () {
     beforeEach(async function () {
       // Give DAO some tokens before transferring governance
-      await cap.connect(owner).transfer(daoAddress.address, ethers.parseEther("100000000"));
+      await cap.connect(owner).transfer(daoAddress.address, ethers.utils.parseEther("100000000"));
 
       // Setup: Give DAO governance control
       await cap.connect(owner).setGovernance(daoAddress.address);
 
       // DAO gives Safe some tokens
-      await cap.connect(daoAddress).transfer(safeAddress, ethers.parseEther("10000000"));
+      await cap.connect(daoAddress).transfer(safeAddress, ethers.utils.parseEther("10000000"));
     });
 
     it("Should simulate complete DAO governance workflow", async function () {
@@ -320,15 +330,15 @@ describe("Zodiac Safe Integration Tests", function () {
 
     it("Should simulate Safe treasury operations with token transfers", async function () {
       const safeBalanceBefore = await cap.balanceOf(safeAddress);
-      const smallAmount = ethers.parseEther("30000");
+      const smallAmount = ethers.utils.parseEther("30000");
 
       // Simulate small transfer that board can approve
       await cap.connect(treasury).transfer(user.address, smallAmount);
 
       // Verify balance change accounting for tax
       // Note: safeAddress = treasury (fee recipient), so it receives its own tax back
-      const userReceived = (smallAmount * BigInt(9900)) / BigInt(10000);
-      const expectedBalance = safeBalanceBefore - userReceived;
+      const userReceived = smallAmount.mul(9900).div(10000);
+      const expectedBalance = safeBalanceBefore.sub(userReceived);
       expect(await cap.balanceOf(safeAddress)).to.equal(expectedBalance);
     });
   });

@@ -1,16 +1,16 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { CAPToken } from "../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 import { mine, time as _time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Checkpoint and Multi-Block Tests", function () {
   let cap: CAPToken;
-  let owner: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let user1: HardhatEthersSigner;
-  let user2: HardhatEthersSigner;
-  let user3: HardhatEthersSigner;
+  let owner: Signer;
+  let treasury: Signer;
+  let user1: Signer;
+  let user2: Signer;
+  let user3: Signer;
 
   beforeEach(async function () {
     [owner, treasury, user1, user2, user3] = await ethers.getSigners();
@@ -22,9 +22,9 @@ describe("Checkpoint and Multi-Block Tests", function () {
     })) as unknown as CAPToken;
 
     // Distribute tokens
-    await cap.connect(owner).transfer(user1.address, ethers.parseEther("100000"));
-    await cap.connect(owner).transfer(user2.address, ethers.parseEther("100000"));
-    await cap.connect(owner).transfer(user3.address, ethers.parseEther("100000"));
+    await cap.connect(owner).transfer(user1.address, ethers.utils.parseEther("100000"));
+    await cap.connect(owner).transfer(user2.address, ethers.utils.parseEther("100000"));
+    await cap.connect(owner).transfer(user3.address, ethers.utils.parseEther("100000"));
   });
 
   describe("Voting Power Checkpoints", function () {
@@ -40,7 +40,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       expect(votes1).to.equal(balance1);
 
       // Block 2-5: Transfer tokens (reduces voting power)
-      await cap.connect(user1).transfer(user2.address, ethers.parseEther("10000"));
+      await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("10000"));
       await mine(3);
 
       const block2 = await ethers.provider.getBlockNumber();
@@ -51,7 +51,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       expect(votes2).to.be.lt(votes1);
 
       // Block 6-10: Transfer more tokens
-      await cap.connect(user1).transfer(user3.address, ethers.parseEther("5000"));
+      await cap.connect(user1).transfer(user3.address, ethers.utils.parseEther("5000"));
       await mine(4);
 
       const votes3 = await cap.getVotes(user1.address);
@@ -96,7 +96,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const user1Balance = await cap.balanceOf(user1.address);
       const user2Balance = await cap.balanceOf(user2.address);
 
-      expect(user2Votes3).to.equal(user1Balance + user2Balance);
+      expect(user2Votes3).to.equal(user1Balance.add(user2Balance));
 
       // Verify historical votes
       const pastVotesUser1Block1 = await cap.getPastVotes(user1.address, block1);
@@ -124,7 +124,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const user3Votes1 = await cap.getVotes(user3.address);
       // Due to delegation chain, user3 only gets user2's balance + own balance
       // (user1 delegates to user2, not transitively to user3)
-      expect(user3Votes1).to.equal(user2Balance + user3Balance);
+      expect(user3Votes1).to.equal(user2Balance.add(user3Balance));
 
       // Change delegation: User2 now self-delegates
       await cap.connect(user2).delegate(user2.address);
@@ -136,7 +136,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const user3Votes2 = await cap.getVotes(user3.address);
 
       // User2 gets user1's delegation + own balance
-      expect(user2Votes2).to.equal(user1Balance + user2Balance);
+      expect(user2Votes2).to.equal(user1Balance.add(user2Balance));
       // User3 only has own balance
       expect(user3Votes2).to.equal(user3Balance);
 
@@ -145,7 +145,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
 
       // Verify historical state (query block before current)
       const pastUser3Votes = await cap.getPastVotes(user3.address, block1 - 1);
-      expect(pastUser3Votes).to.equal(user2Balance + user3Balance);
+      expect(pastUser3Votes).to.equal(user2Balance.add(user3Balance));
     });
 
     it("Should track total voting power across blocks", async function () {
@@ -157,24 +157,25 @@ describe("Checkpoint and Multi-Block Tests", function () {
 
       const _block1 = await ethers.provider.getBlockNumber();
 
-      const totalVotes1 =
-        (await cap.getVotes(user1.address)) + (await cap.getVotes(user2.address)) + (await cap.getVotes(user3.address));
+      const totalVotes1 = (await cap.getVotes(user1.address))
+        .add(await cap.getVotes(user2.address))
+        .add(await cap.getVotes(user3.address));
 
-      const totalBalance =
-        (await cap.balanceOf(user1.address)) +
-        (await cap.balanceOf(user2.address)) +
-        (await cap.balanceOf(user3.address));
+      const totalBalance = (await cap.balanceOf(user1.address))
+        .add(await cap.balanceOf(user2.address))
+        .add(await cap.balanceOf(user3.address));
 
       expect(totalVotes1).to.equal(totalBalance);
 
       // Burn some tokens (reduces total voting power)
-      await cap.connect(user1).burn(ethers.parseEther("10000"));
+      await cap.connect(user1).burn(ethers.utils.parseEther("10000"));
       await mine(5);
 
-      const totalVotes2 =
-        (await cap.getVotes(user1.address)) + (await cap.getVotes(user2.address)) + (await cap.getVotes(user3.address));
+      const totalVotes2 = (await cap.getVotes(user1.address))
+        .add(await cap.getVotes(user2.address))
+        .add(await cap.getVotes(user3.address));
 
-      expect(totalVotes2).to.equal(totalBalance - ethers.parseEther("10000"));
+      expect(totalVotes2).to.equal(totalBalance.sub(ethers.utils.parseEther("10000")));
       expect(totalVotes2).to.be.lt(totalVotes1);
     });
   });
@@ -185,7 +186,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const block0 = await ethers.provider.getBlockNumber();
 
       // Propose and execute mint
-      await cap.connect(owner).proposeMint(user1.address, ethers.parseEther("50000"));
+      await cap.connect(owner).proposeMint(user1.address, ethers.utils.parseEther("50000"));
 
       // Fast forward 7 days
       await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
@@ -196,15 +197,15 @@ describe("Checkpoint and Multi-Block Tests", function () {
 
       const block1 = await ethers.provider.getBlockNumber();
       const supply1 = await cap.totalSupply();
-      expect(supply1).to.equal(initialSupply + ethers.parseEther("50000"));
+      expect(supply1).to.equal(initialSupply.add(ethers.utils.parseEther("50000")));
 
       // Burn tokens
-      await cap.connect(user1).burn(ethers.parseEther("25000"));
+      await cap.connect(user1).burn(ethers.utils.parseEther("25000"));
       await mine(1);
 
       const block2 = await ethers.provider.getBlockNumber();
       const supply2 = await cap.totalSupply();
-      expect(supply2).to.equal(supply1 - ethers.parseEther("25000"));
+      expect(supply2).to.equal(supply1.sub(ethers.utils.parseEther("25000")));
 
       // Mine additional blocks to finalize checkpoints
       await mine(2);
@@ -222,15 +223,15 @@ describe("Checkpoint and Multi-Block Tests", function () {
 
     it("Should handle supply changes with tax burns", async function () {
       // Set fee recipient to zero address (burn mode)
-      await cap.connect(owner).setFeeRecipient(ethers.ZeroAddress);
+      await cap.connect(owner).setFeeRecipient(ethers.constants.AddressZero);
       await mine(1);
 
       const initialSupply = await cap.totalSupply();
       const block1 = await ethers.provider.getBlockNumber();
 
       // Transfer with tax burn
-      const transferAmount = ethers.parseEther("10000");
-      const tax = (transferAmount * 100n) / 10000n; // 1%
+      const transferAmount = ethers.utils.parseEther("10000");
+      const tax = transferAmount.mul(100).div(10000); // 1%
 
       await cap.connect(user1).transfer(user2.address, transferAmount);
       await mine(1);
@@ -238,14 +239,14 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const block2 = await ethers.provider.getBlockNumber();
       const supply2 = await cap.totalSupply();
 
-      expect(supply2).to.equal(initialSupply - tax);
+      expect(supply2).to.equal(initialSupply.sub(tax));
 
       // Mine additional blocks to finalize checkpoints
       await mine(2);
 
       // Verify past supplies (query blocks before current)
       const pastSupply1 = await cap.getPastTotalSupply(block1 - 1);
-      expect(pastSupply1).to.be.lte(initialSupply + ethers.parseEther("1000"));
+      expect(pastSupply1).to.be.lte(initialSupply + ethers.utils.parseEther("1000"));
 
       const pastSupply2 = await cap.getPastTotalSupply(block2 - 1);
       expect(pastSupply2).to.be.lte(supply2 + tax);
@@ -270,13 +271,13 @@ describe("Checkpoint and Multi-Block Tests", function () {
       const user3Balance = await cap.balanceOf(user3.address);
 
       // User2 should have their balance + user3's balance
-      expect(user2VotesAtProposal).to.equal(user2Balance + user3Balance);
+      expect(user2VotesAtProposal).to.equal(user2Balance.add(user3Balance));
 
       // Simulate voting period (several blocks)
       await mine(10);
 
       // During voting, users transfer tokens
-      await cap.connect(user1).transfer(user2.address, ethers.parseEther("20000"));
+      await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("20000"));
       await mine(5);
 
       // Voting power at proposal block should remain unchanged
@@ -339,7 +340,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
       await mine(1);
 
       // Transfer between delegated accounts
-      const tx = await cap.connect(user1).transfer(user2.address, ethers.parseEther("1000"));
+      const tx = await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("1000"));
       const receipt = await tx.wait();
 
       // Should update checkpoints for both parties
@@ -348,18 +349,18 @@ describe("Checkpoint and Multi-Block Tests", function () {
 
     it("Should compare gas: transfer with vs without active delegation", async function () {
       // Transfer WITHOUT delegation
-      const tx1 = await cap.connect(user1).transfer(user2.address, ethers.parseEther("1000"));
+      const tx1 = await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("1000"));
       const receipt1 = await tx1.wait();
-      const gasWithoutDelegation = receipt1?.gasUsed || 0n;
+      const gasWithoutDelegation = receipt1?.gasUsed || ethers.BigNumber.from(0);
 
       // Setup delegation
       await cap.connect(user1).delegate(user1.address);
       await cap.connect(user2).delegate(user2.address);
 
       // Transfer WITH delegation (updates checkpoints)
-      const tx2 = await cap.connect(user1).transfer(user2.address, ethers.parseEther("1000"));
+      const tx2 = await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("1000"));
       const receipt2 = await tx2.wait();
-      const gasWithDelegation = receipt2?.gasUsed || 0n;
+      const gasWithDelegation = receipt2?.gasUsed || ethers.BigNumber.from(0);
 
       // Gas with delegation should be measurably higher but reasonable
       expect(gasWithDelegation).to.be.gt(gasWithoutDelegation);
@@ -394,7 +395,7 @@ describe("Checkpoint and Multi-Block Tests", function () {
 
       // Create checkpoints over many blocks
       for (let i = 0; i < 5; i++) {
-        await cap.connect(user1).transfer(user2.address, ethers.parseEther("1000"));
+        await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("1000"));
         await mine(10);
 
         // Mine one more block before querying to ensure checkpoint is finalized

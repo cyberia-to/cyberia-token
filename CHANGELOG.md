@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2025-11-18
+
+### Added
+
+- Fee recipient validation security feature: prevents setting contract address as fee recipient
+- Rolling 30-day mint cap (100M tokens per period) to prevent flash minting attacks
+- OFT burn function restrictions: burn() and burnFrom() removed from CAPTokenOFT for security
+- Slippage protection for inbound transfers: configurable max inbound slippage with 5% default
+- `setMaxInboundSlippage()` function in CAPTokenOFTAdapter for owner-controlled slippage limits
+- Comprehensive test coverage for new security features (200 Hardhat tests passing)
+- Test documentation for rolling mint window behavior and edge cases
+
+### Changed
+
+- Updated test count from 191 to 200 Hardhat tests (9 new tests for security improvements)
+- Total test coverage now 306 tests (200 Hardhat + 106 Foundry)
+- Updated README.md to document new security features
+- Enhanced LayerZero OFT documentation with slippage protection details
+- Improved test suite for ethers v5 compatibility across all files
+
+### Fixed
+
+- Fixed test selector validation for ethers v5 (manual keccak256 computation instead of .selector property)
+- Fixed mint cap rolling window test timing logic for proper 30-day period reset
+- Fixed Invariants state consistency test for proper BigNumber arithmetic
+- Fixed all ethers v5 compatibility issues in test suite (BigInt vs BigNumber mixing)
+- All 200 Hardhat tests now passing (up from 196 after security changes)
+
+### Security
+
+- ✅ Fee recipient cannot be contract address (prevents accidental locking of tokens)
+- ✅ OFT burn functions restricted to LayerZero endpoint (prevents unauthorized burning)
+- ✅ Slippage protection on inbound transfers (default 5%, max 100%)
+- ✅ Rolling mint cap enforcement (100M per 30-day period)
+
 ## [1.3.0] - 2025-10-21
 
 ### Added

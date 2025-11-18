@@ -1,16 +1,16 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { CAPToken } from "../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 
 describe("Security Tests", function () {
   let cap: CAPToken;
-  let owner: HardhatEthersSigner;
-  let treasury: HardhatEthersSigner;
-  let attacker: HardhatEthersSigner;
-  let user1: HardhatEthersSigner;
-  let user2: HardhatEthersSigner;
-  let pool: HardhatEthersSigner;
+  let owner: Signer;
+  let treasury: Signer;
+  let attacker: Signer;
+  let user1: Signer;
+  let user2: Signer;
+  let pool: Signer;
 
   beforeEach(async function () {
     [owner, treasury, attacker, user1, user2, pool] = await ethers.getSigners();
@@ -22,8 +22,8 @@ describe("Security Tests", function () {
     })) as unknown as CAPToken;
 
     // Distribute some tokens for testing
-    await cap.connect(owner).transfer(user1.address, ethers.parseEther("10000"));
-    await cap.connect(owner).transfer(attacker.address, ethers.parseEther("1000"));
+    await cap.connect(owner).transfer(user1.address, ethers.utils.parseEther("10000"));
+    await cap.connect(owner).transfer(attacker.address, ethers.utils.parseEther("1000"));
   });
 
   describe("Access Control", function () {
@@ -45,9 +45,9 @@ describe("Security Tests", function () {
       const newImplementation = await CAPv2.deploy();
 
       // Upgrades require UPGRADER_ROLE
-      await expect(
-        cap.connect(attacker).upgradeToAndCall(await newImplementation.getAddress(), "0x")
-      ).to.be.revertedWith("ONLY_GOVERNANCE");
+      await expect(cap.connect(attacker).upgradeToAndCall(newImplementation.address, "0x")).to.be.revertedWith(
+        "ONLY_GOVERNANCE"
+      );
     });
 
     it("Should prevent governance transfer by non-governance", async function () {
@@ -74,17 +74,17 @@ describe("Security Tests", function () {
     it("Should maintain consistent total supply through all operations", async function () {
       const initialSupply = await cap.totalSupply();
 
-      await cap.connect(user1).transfer(user2.address, ethers.parseEther("100"));
+      await cap.connect(user1).transfer(user2.address, ethers.utils.parseEther("100"));
       await cap.connect(owner).addPool(pool.address);
-      await cap.connect(user1).transfer(pool.address, ethers.parseEther("50"));
-      await cap.connect(user1).burn(ethers.parseEther("10"));
+      await cap.connect(user1).transfer(pool.address, ethers.utils.parseEther("50"));
+      await cap.connect(user1).burn(ethers.utils.parseEther("10"));
 
       const currentSupply = await cap.totalSupply();
-      expect(currentSupply).to.equal(initialSupply - ethers.parseEther("10"));
+      expect(currentSupply).to.equal(initialSupply.sub(ethers.utils.parseEther("10")));
     });
 
     it("Should restrict minting to authorized roles only", async function () {
-      const mintAmount = ethers.parseEther("1000000");
+      const mintAmount = ethers.utils.parseEther("1000000");
 
       // Attacker without governance cannot propose mint
       await expect(cap.connect(attacker).proposeMint(attacker.address, mintAmount)).to.be.revertedWith(
@@ -102,7 +102,7 @@ describe("Security Tests", function () {
 
       await expect(cap.connect(owner).executeMint()).to.not.be.reverted;
 
-      expect(await cap.totalSupply()).to.equal(initialSupply + mintAmount);
+      expect(await cap.totalSupply()).to.equal(initialSupply.add(mintAmount));
     });
   });
 
@@ -129,22 +129,18 @@ describe("Security Tests", function () {
 
     it("Should handle transfers with insufficient balance", async function () {
       const userBalance = await cap.balanceOf(user1.address);
-      const excessiveAmount = userBalance + 1n;
+      const excessiveAmount = userBalance.add(1);
 
-      await expect(cap.connect(user1).transfer(user2.address, excessiveAmount)).to.be.revertedWithCustomError(
-        cap,
+      await expect(cap.connect(user1).transfer(user2.address, excessiveAmount)).to.be.revertedWith(
         "ERC20InsufficientBalance"
       );
     });
 
     it("Should handle burning more than balance", async function () {
       const userBalance = await cap.balanceOf(user1.address);
-      const excessiveAmount = userBalance + 1n;
+      const excessiveAmount = userBalance.add(1);
 
-      await expect(cap.connect(user1).burn(excessiveAmount)).to.be.revertedWithCustomError(
-        cap,
-        "ERC20InsufficientBalance"
-      );
+      await expect(cap.connect(user1).burn(excessiveAmount)).to.be.revertedWith("ERC20InsufficientBalance");
     });
   });
 

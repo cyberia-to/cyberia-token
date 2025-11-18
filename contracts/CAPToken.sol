@@ -183,8 +183,10 @@ contract CAPToken is
 
 	/// @notice Update the fee recipient address
 	/// @param _feeRecipient The new fee recipient address. Use address(0) to enable burn mode where taxes are burned instead of collected
-	/// @dev Only callable by governance (Aragon DAO via DAO.execute())
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute()). Cannot be set to contract address (security)
+	/// @dev SECURITY: Prevents accidental locking of funds by setting contract as its own fee recipient
 	function setFeeRecipient(address _feeRecipient) external onlyGovernance {
+		require(_feeRecipient != address(this), "FEE_RECIPIENT_CANNOT_BE_CONTRACT");
 		address oldRecipient = feeRecipient;
 		feeRecipient = _feeRecipient; // zero address enables burn mode
 		emit FeeRecipientUpdated(oldRecipient, _feeRecipient);
@@ -217,16 +219,18 @@ contract CAPToken is
 	}
 
 	/// @notice Propose minting new tokens (requires 7-day timelock before executing)
-	/// @dev Only callable by governance (Aragon DAO via DAO.execute()). Subject to rate limiting.
+	/// @dev Only callable by governance (Aragon DAO via DAO.execute()). Subject to 30-day rolling window rate limiting (max 100M per period)
 	/// @param to Address to receive minted tokens
-	/// @param amount Amount of tokens to mint
+	/// @param amount Amount of tokens to mint (subject to MINT_CAP_PER_PERIOD limit and MAX_SUPPLY cap)
 	function proposeMint(address to, uint256 amount) external onlyGovernance {
 		require(to != address(0), "MINT_TO_ZERO");
 		require(totalSupply() + amount <= MAX_SUPPLY, "EXCEEDS_MAX_SUPPLY");
 
-		// Reset period if needed
+		// Reset period if needed (use increment to enforce rolling window)
 		if (block.timestamp >= lastMintPeriodStart + MINT_PERIOD) {
-			lastMintPeriodStart = block.timestamp;
+			// Calculate how many periods have elapsed and advance by that many periods
+			uint256 elapsedPeriods = (block.timestamp - lastMintPeriodStart) / MINT_PERIOD;
+			lastMintPeriodStart += elapsedPeriods * MINT_PERIOD;
 			mintedInCurrentPeriod = 0;
 		}
 
@@ -250,9 +254,11 @@ contract CAPToken is
 		address to = pendingMintTo;
 		uint256 amount = pendingMintAmount;
 
-		// Reset period if needed
+		// Reset period if needed (use increment to enforce rolling window)
 		if (block.timestamp >= lastMintPeriodStart + MINT_PERIOD) {
-			lastMintPeriodStart = block.timestamp;
+			// Calculate how many periods have elapsed and advance by that many periods
+			uint256 elapsedPeriods = (block.timestamp - lastMintPeriodStart) / MINT_PERIOD;
+			lastMintPeriodStart += elapsedPeriods * MINT_PERIOD;
 			mintedInCurrentPeriod = 0;
 		}
 
