@@ -119,6 +119,9 @@ jobs:
         env:
           CI: true
 
+      - name: Compile contracts
+        run: npm run build
+
       - name: Run coverage
         run: npm run test:coverage
 
