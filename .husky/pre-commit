@@ -11,6 +11,16 @@ npx lint-staged || {
   exit 1
 }
 
+# Check if contracts or tests were changed
+echo ""
+CONTRACTS_CHANGED=$(git diff --cached --name-only | grep -E "^(contracts|test)/" || true)
+
+if [ -z "$CONTRACTS_CHANGED" ]; then
+  echo "ℹ️  No contract or test changes detected"
+  echo "✅ Pre-commit checks passed! (tests skipped)"
+  exit 0
+fi
+
 # Run Hardhat tests
 echo ""
 echo "🧪 Running Hardhat tests..."
